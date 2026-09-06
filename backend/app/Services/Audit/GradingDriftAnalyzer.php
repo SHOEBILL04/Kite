@@ -4,6 +4,7 @@ namespace App\Services\Audit;
 
 use App\Models\AuditReport;
 use App\Models\Course;
+use App\Models\GradingBatch;
 use App\Models\SectionGrade;
 use App\Services\Ai\AiClient;
 use Illuminate\Support\Facades\Log;
@@ -18,14 +19,41 @@ class GradingDriftAnalyzer
     /**
      * Run deterministic statistical grading drift analysis, supplemented by AI qualitative synthesis.
      *
-     * @param int $courseId
+     * Scoped to a grading batch when one is supplied, so the comparison is
+     * between sections that sat the same assessment out of the same total.
+     * Passing only a course id keeps the seeded demo path working: it resolves
+     * to that course's most recent batch, falling back to every row on the
+     * course if none exists.
+     *
+     * The statistics themselves are unchanged by batching -- the same OLS
+     * leniency index, z-scores, skewness, variance ratio and normalisation
+     * proposal run over whichever set of rows is selected.
+     *
      * @return array Matches GradingDriftReport shape from contract.js
      */
-    public function analyze(int $courseId): array
+    public function analyze(int $courseId, ?GradingBatch $batch = null): array
     {
-        $grades = SectionGrade::with('faculty')
+        // Resolving a bare course id to a batch is not optional: once a course
+        // has several assessments, pooling every row on the course would mix
+        // marks from different assessments out of different totals and quietly
+        // corrupt every statistic below. Prefer the most recent batch that has
+        // enough sections to compare.
+        $batch ??= GradingBatch::with('course')
             ->where('course_id', $courseId)
-            ->get();
+            ->whereHas('submissions', fn ($q) => $q, '>=', GradingBatch::MIN_SECTIONS_FOR_AUDIT)
+            ->latest('id')
+            ->first();
+
+        $query = SectionGrade::with(['faculty', 'submission.faculty']);
+
+        if ($batch) {
+            $query->where('grading_batch_id', $batch->id);
+        } else {
+            // No batch exists at all -- pre-batch data, kept working.
+            $query->where('course_id', $courseId);
+        }
+
+        $grades = $query->get();
 
         if ($grades->isEmpty()) {
             return $this->aiClient->loadFixture('grading-drift');
@@ -129,11 +157,20 @@ class GradingDriftAnalyzer
                 $distribution[] = ['bucket' => $label, 'count' => $count];
             }
 
-            $instructorName = $secGrades->first()->faculty?->name ?? 'Course Instructor';
+            $first = $secGrades->first();
+            $instructorName = $first->faculty?->name ?? 'Course Instructor';
+
+            // Who uploaded this section, and when. The audit is about specific
+            // people's submissions, so the report says so rather than leaving
+            // the sections anonymous.
+            $submission = $first->submission;
 
             $sectionStats[] = [
                 'section_name' => $sectionName,
                 'instructor' => $instructorName,
+                'uploaded_by' => $submission?->faculty?->name ?? $instructorName,
+                'uploaded_at' => $submission?->uploaded_at?->toISOString(),
+                'file_name' => $submission?->file_name,
                 'n' => $n,
                 'mean' => round($secMean, 1),
                 'std_dev' => round($secStdDev, 1),
@@ -189,6 +226,17 @@ class GradingDriftAnalyzer
         ]);
 
         $finalReport = [
+            'batch' => $batch ? [
+                'id' => $batch->id,
+                'course_id' => $batch->course_id,
+                'course_code' => $batch->course?->code ?? '',
+                'course_title' => $batch->course?->title ?? '',
+                'semester' => $batch->semester,
+                'assessment_name' => $batch->assessment_name,
+                'max_marks' => $batch->max_marks,
+                'status' => $batch->status,
+                'sections_submitted' => $batch->submissions()->count(),
+            ] : null,
             'drift_detected' => $driftDetected,
             'severity' => $severity,
             'section_stats' => array_map(function ($s) {
@@ -214,8 +262,26 @@ class GradingDriftAnalyzer
      */
     protected function generateAiInsights(int $courseId, array $computedStats): array
     {
-        $system = "You are a university academic audit specialist. Explain the provided empirical grading drift statistics between parallel course sections. " .
-            "DO NOT invent new numbers. Reference ONLY the exact means, std devs, skewness, and shift values provided in the prompt.";
+        // Tuned for Llama 3.3: imperatives rather than soft phrasing, and one
+        // complete worked example. The output contract and the schema are
+        // appended by GroqDriver at the very end of the system message, where
+        // Llama weights them most heavily.
+        $system = <<<'PROMPT'
+        You are a university academic audit specialist. Explain empirical grading drift statistics between parallel course sections.
+
+        Rules:
+        - Reference ONLY the means, standard deviations, skewness, z-scores, leniency indices and shift values given in the prompt.
+        - Do not invent numbers. Every figure you write must appear in the input.
+        - Write for a department head who will act on it this week.
+        - Give each insight a severity of exactly "low", "medium" or "high".
+
+        WORKED EXAMPLE
+        Input:
+        {"section_stats":[{"section_name":"Section C","mean":21.0,"std_dev":2.0,"leniency_index":1.15},{"section_name":"Section D","mean":17.0,"std_dev":5.0,"leniency_index":0.88}],"normalization":{"section_name":"Section D","suggested_shift":3.0}}
+
+        Output:
+        {"insights":[{"title":"Section C marks 4.00 above Section D","detail":"Section C averages 21.00 against 17.00 in Section D on the same assessment, with leniency indices of 1.15 and 0.88.","severity":"high"},{"title":"Section D spreads marks more widely","detail":"Section D's standard deviation of 5.00 is 2.5x Section C's 2.00, so the two graders differ in spread as well as level.","severity":"medium"}],"ai_summary":"Section C averages 21.00 against 17.00 in Section D on the same assessment. A +3.0 mark normalisation on Section D is proposed."}
+        PROMPT;
 
         $user = "Empirical Statistics:\n" . json_encode($computedStats, JSON_PRETTY_PRINT);
 

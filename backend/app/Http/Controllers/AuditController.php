@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditReport;
 use App\Models\Course;
 use App\Models\Exam;
+use App\Models\GradingBatch;
 use App\Models\ExamQuestion;
 use App\Models\SectionGrade;
 use App\Models\Student;
@@ -31,12 +32,63 @@ class AuditController extends Controller
      */
     public function gradingDrift(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'course_id' => 'required|integer',
+        $request->validate([
+            'grading_batch_id' => 'sometimes|integer|exists:grading_batches,id',
+            'course_id' => 'sometimes|integer|exists:courses,id',
         ]);
 
+        if (! $request->filled('grading_batch_id') && ! $request->filled('course_id')) {
+            return response()->json([
+                'message' => 'Provide a grading_batch_id, or a course_id to fall back to the most recent batch for that course.',
+                'errors' => ['grading_batch_id' => ['A grading batch or course is required.']],
+            ], 422);
+        }
+
+        // A batch is the real unit of a parity audit. course_id is kept as a
+        // fallback so the seeded demo path still runs: it resolves to that
+        // course's most recent batch.
+        $batch = $request->filled('grading_batch_id')
+            ? GradingBatch::with(['course', 'submissions'])->find($request->integer('grading_batch_id'))
+            // Prefer the most recent batch that actually has enough sections to
+            // compare; only if none does fall back to the newest, so the caller
+            // still gets the explanatory 422 rather than a silent empty report.
+            : (GradingBatch::with(['course', 'submissions'])
+                ->where('course_id', $request->integer('course_id'))
+                ->whereHas('submissions', fn ($q) => $q, '>=', GradingBatch::MIN_SECTIONS_FOR_AUDIT)
+                ->latest('id')
+                ->first()
+                ?? GradingBatch::with(['course', 'submissions'])
+                    ->where('course_id', $request->integer('course_id'))
+                    ->latest('id')
+                    ->first());
+
+        if ($batch) {
+            $submitted = $batch->submissions()->count();
+
+            if ($submitted < GradingBatch::MIN_SECTIONS_FOR_AUDIT) {
+                return response()->json([
+                    'message' => sprintf(
+                        'This batch has %d of the %d sections needed for a parity audit. Parity is a comparison — it needs at least two sections to compare.',
+                        $submitted,
+                        GradingBatch::MIN_SECTIONS_FOR_AUDIT
+                    ),
+                    'errors' => ['grading_batch_id' => ['Not enough sections have submitted marks.']],
+                    'sections_submitted' => $submitted,
+                    'sections_required' => GradingBatch::MIN_SECTIONS_FOR_AUDIT,
+                ], 422);
+            }
+        }
+
+        $courseId = (int) ($batch?->course_id ?? $request->integer('course_id'));
+
         try {
-            $report = $this->gradingAnalyzer->analyze((int) $validated['course_id']);
+            $report = $this->gradingAnalyzer->analyze($courseId, $batch);
+
+            if ($batch) {
+                $batch->update(['status' => GradingBatch::STATUS_AUDITED]);
+                $report['batch']['status'] = GradingBatch::STATUS_AUDITED;
+            }
+
             return response()->json(['data' => $report]);
         } catch (Throwable $e) {
             Log::error("Grading drift endpoint error: " . $e->getMessage());

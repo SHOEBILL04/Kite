@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GradingBatchController;
 use App\Http\Controllers\VulnerableStudentController;
 use App\Models\AuditReport;
 use App\Models\Course;
@@ -58,4 +59,13 @@ Route::post('/audit/vulnerable-students', VulnerableStudentController::class);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+
+    // Multi-teacher mark collection. Role rules are enforced in the
+    // controller, not by hiding buttons in the UI.
+    Route::get('/grading-batches', [GradingBatchController::class, 'index']);
+    Route::post('/grading-batches', [GradingBatchController::class, 'store']);
+    Route::post('/grading-batches/{batch}/upload', [GradingBatchController::class, 'upload']);
+    Route::get('/grading-batches/{batch}/template', [GradingBatchController::class, 'template']);
+    Route::get('/grading-batches/{batch}/my-stats', [GradingBatchController::class, 'myStats']);
+    Route::delete('/grading-batches/{batch}/submissions/{submission}', [GradingBatchController::class, 'destroySubmission']);
 });
