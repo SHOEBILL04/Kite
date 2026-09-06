@@ -3,118 +3,72 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  :root,
+  [data-theme="light"],
+  [data-theme="dark"] {
     color-scheme: light;
 
-    /* Base Palette */
-    --green-950: #0E3A12;
-    --green-900: #1B5E20;
-    --green-500: #66BB6A;
-    --green-200: #A5D6A7;
-    --green-50:  #E8F5E9;
-    --amber-500: #E9C46A;
-    --red-500:   #E63946;
-    --teal-500:  #458393;
+    /* Collegiate Academic Ivy Green Palette */
+    --green-950: #0B2917;
+    --green-900: #123C23;
+    --green-500: #1B6338;
+    --green-200: #A3D1B2;
+    --green-50:  #F2F8F4;
+    --amber-500: #D97706;
+    --red-500:   #DC2626;
+    --teal-500:  #0F766E;
 
-    /* Light Theme Neutrals */
+    /* Light University Neutrals & Surfaces */
     --surface: #FFFFFF;
-    --canvas: #F7FAF7;
-    --n-100: #EFF2EF;
-    --n-300: #D4DAD5;
-    --n-500: #7C8A7E;
-    --n-700: #495250;
+    --canvas: #F9FAF8;
+    --n-100: #F1F6F2;
+    --n-300: #E2E8F0;
+    --n-500: #64748B;
+    --n-700: #334155;
 
-    /* Light Theme Semantic Tokens */
-    --bg-canvas: #F7FAF7;
+    /* Semantic Tokens */
+    --bg-canvas: #F9FAF8;
     --bg-surface: #FFFFFF;
-    --bg-subtle: #E8F5E9;
-    --bg-hover: #EFF2EF;
+    --bg-subtle: #F1F6F2;
+    --bg-hover: #EBF2ED;
 
-    --text-primary: #1B5E20;
-    --text-heading: #0E3A12;
-    --text-secondary: #495250;
-    --text-muted: #7C8A7E;
+    --text-primary: #1E293B;
+    --text-heading: #0B2917;
+    --text-secondary: #475569;
+    --text-muted: #64748B;
     --text-inverse: #FFFFFF;
 
-    --border-default: #D4DAD5;
-    --border-strong: #A5D6A7;
-    --border-focus: #66BB6A;
+    --border-default: #E2E8F0;
+    --border-strong: #A3D1B2;
+    --border-focus: #1B6338;
 
-    --action-primary: #1B5E20;
-    --action-primary-hover: #0E3A12;
+    --action-primary: #1B6338;
+    --action-primary-hover: #123C23;
     --action-primary-text: #FFFFFF;
 
     /* Status Triplets (Fill / Border / Text) */
-    --status-pass-bg: #E8F5E9;
-    --status-pass-border: #A5D6A7;
-    --status-pass-text: #1B5E20;
+    --status-pass-bg: #F0FDF4;
+    --status-pass-border: #86EFAC;
+    --status-pass-text: #166534;
 
-    --status-warning-bg: #FDF6E7;
-    --status-warning-border: #E9C46A;
-    --status-warning-text: #8A6220;
+    --status-warning-bg: #FFFBEB;
+    --status-warning-border: #FDE68A;
+    --status-warning-text: #92400E;
 
-    --status-critical-bg: #FDECEE;
-    --status-critical-border: #E63946;
-    --status-critical-text: #A81E2A;
+    --status-critical-bg: #FEF2F2;
+    --status-critical-border: #FECACA;
+    --status-critical-text: #991B1B;
 
-    --status-info-bg: #EAF2F4;
-    --status-info-border: #458393;
-    --status-info-text: #2E5A66;
+    --status-info-bg: #F0F9FF;
+    --status-info-border: #BAE6FD;
+    --status-info-text: #0369A1;
 
-    /* Backdrop & Shadows */
-    --bg-backdrop: rgba(27, 94, 32, 0.18);
-    --shadow-elevation: 0 1px 3px rgba(27, 94, 32, 0.08);
+    /* Academic Elevation & Shadows */
+    --bg-backdrop: rgba(11, 41, 23, 0.2);
+    --shadow-elevation: 0 1px 3px rgba(11, 41, 23, 0.07);
 
     /* Chart opacity */
     --chart-area-opacity: 0.15;
-  }
-
-  [data-theme="dark"] {
-    color-scheme: dark;
-
-    /* Dark Theme Semantic Tokens */
-    --bg-canvas: #0D140E;
-    --bg-surface: #141D16;
-    --bg-subtle: #1B291D;
-    --bg-hover: #22321F;
-
-    --text-primary: #DCEBDD;
-    --text-heading: #EAF5EB;
-    --text-secondary: #A5B8A7;
-    --text-muted: #7A8C7C;
-    --text-inverse: #0D140E;
-
-    --border-default: #2A3A2C;
-    --border-strong: #3E5241;
-    --border-focus: #66BB6A;
-
-    --action-primary: #66BB6A;
-    --action-primary-hover: #7DCB81;
-    --action-primary-text: #0D140E;
-
-    /* Status Triplets (Fill / Border / Text) */
-    --status-pass-bg: #16301A;
-    --status-pass-border: #2F6B34;
-    --status-pass-text: #8FD494;
-
-    --status-warning-bg: #33290F;
-    --status-warning-border: #7A6127;
-    --status-warning-text: #F0D492;
-
-    --status-critical-bg: #3A1518;
-    --status-critical-border: #7E2830;
-    --status-critical-text: #F5949B;
-
-    --status-info-bg: #14282E;
-    --status-info-border: #2C5A67;
-    --status-info-text: #7FB6C4;
-
-    /* Backdrop & Elevation */
-    --bg-backdrop: rgba(0, 0, 0, 0.6);
-    --shadow-elevation: 0 4px 16px rgba(0, 0, 0, 0.4);
-
-    /* Chart area opacity */
-    --chart-area-opacity: 0.10;
   }
 
   html,
@@ -128,7 +82,7 @@
     color: var(--text-primary);
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
-    transition: background-color 200ms ease-out, border-color 200ms ease-out;
+    transition: background-color 150ms ease-out, border-color 150ms ease-out;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -157,8 +111,8 @@
   }
 
   ::selection {
-    background-color: var(--bg-subtle);
-    color: var(--text-primary);
+    background-color: #D1FAE5;
+    color: #064E3B;
   }
 
   /* Custom scrollbars */
@@ -167,12 +121,12 @@
     scrollbar-color: var(--border-default) transparent;
   }
   *::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   *::-webkit-scrollbar-thumb {
     border-radius: 4px;
-    background-color: var(--border-default);
+    background-color: #CBD5E1;
   }
 }
 
