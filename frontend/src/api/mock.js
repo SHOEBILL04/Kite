@@ -72,10 +72,71 @@ export const MOCK_TOKEN = '1|mock-sanctum-token-cognifaculty';
  * REFERENCE DATA
  * ======================================================================= */
 
+/**
+ * Syllabi verbatim from `backend/database/seeders/DatabaseSeeder.php`. The Curriculum
+ * Harmonizer diffs these two documents line by line, so the week numbers here
+ * are the same ones `MOCK_SYLLABUS` refers to ("CSE 2101 · Week 7").
+ *
+ * `String.raw` keeps the LaTeX backslashes intact.
+ */
+const SYLLABUS_CSE_2101 = String.raw`# CSE 2101: Data Structures
+**Credits:** 3.0 | **Prerequisites:** Structured Programming (CSE 1101)
+
+### Course Overview
+Fundamental concepts of data structures, abstract data types (ADTs), memory representation, and algorithm efficiency analysis.
+
+### Weekly Topic Breakdown
+- **Week 1:** Introduction to Data Structures, Pointer Arithmetic, Dynamic Memory Allocation, and Asymptotic Notations ($O, \Omega, \Theta$).
+- **Week 2:** Linear Data Structures: Static and Dynamic Arrays, Resizing Strategies, Bounds Checking.
+- **Week 3:** Singly Linked Lists: Node representation, Insertion, Deletion, Reversal, Cycle Detection (Floyd's Algorithm).
+- **Week 4:** Doubly and Circular Linked Lists: Multi-list implementations, Sentinel nodes, Practical memory trade-offs.
+- **Week 5:** Stacks: Array vs Linked-List representations, Applications in Expression Parsing, Infix to Postfix Conversion, Postfix Evaluation.
+- **Week 6:** Queues: Linear queues, Circular buffers, Double-Ended Queues (Deques), Priority Queue ADT overview.
+- **Week 7:** Recursion Fundamentals: Call Stack dynamics, Activation records, Divide-and-Conquer paradigm, Recurrence relations.
+- **Week 8:** Trees: Binary Tree fundamentals, Full, Complete, and Degenerate Trees, Recursive Traversals (Pre, In, Post, Level-order).
+- **Week 9:** Binary Search Trees (BST): Insertion, Search, Deletion edge cases, Minimum, Maximum, Successor/Predecessor queries.
+- **Week 10:** Balanced Search Trees: AVL Trees, Balance Factors, Single Rotations (LL, RR) and Double Rotations (LR, RL), Insertion balance maintenance.
+- **Week 11:** Graph Fundamentals: Representations (Adjacency Matrix, Adjacency List), Traversals (Breadth-First Search [BFS], Depth-First Search [DFS]), Connected Components.
+- **Week 12:** Hashing: Hash Functions, Separate Chaining, Open Addressing (Linear Probing, Quadratic Probing, Double Hashing), Load Factor Analysis.`;
+
+const SYLLABUS_CSE_2103 = String.raw`# CSE 2103: Algorithms
+**Credits:** 3.0 | **Prerequisites:** Data Structures (CSE 2101)
+
+### Course Overview
+Advanced algorithmic paradigms, complexity bounds, optimization strategies, and graph theories.
+
+### Weekly Topic Breakdown
+- **Week 1:** Complexity Analysis: Review of asymptotic bounds ($O, \Omega, \Theta$), Master Theorem, and recursion trees. *(PLANTED RE-TEACH)*
+- **Week 2:** Recursion: Principles of recursion, execution call stacks, and divide-and-conquer formulation. *(PLANTED RE-TEACH)*
+- **Week 3:** Divide and Conquer: Merge Sort, Quick Sort with randomized pivot, Median of Medians, Strassen's Matrix Multiplication.
+- **Week 4:** Amortized Analysis: Potential method, Accounting method, Aggregate analysis in dynamic tables. *(PLANTED GAP: Assumes prior coverage of basic amortized analysis never introduced in curriculum)*
+- **Week 5:** Priority Queues and Advanced Heaps: Binomial Heaps, Fibonacci Heaps, decrease-key amortized bounds. *(PLANTED GAP: Assumes Binary Heap and Heap-sort were covered in CSE 2101, but they were absent)*
+- **Week 6:** Graph Traversal Foundations: Depth-First Search (DFS) and Breadth-First Search (BFS) on directed and undirected graphs. *(PLANTED RE-TEACH)*
+- **Week 7:** Greedy Algorithms: Minimum Spanning Trees (Kruskal with DSU, Prim), Fractional Knapsack, Huffman Coding.
+- **Week 8:** Dynamic Programming I: Optimal Substructure, Overlapping Subproblems, Memoization vs Tabulation, Rod Cutting, 0/1 Knapsack.
+- **Week 9:** Dynamic Programming II: Longest Common Subsequence (LCS), Matrix Chain Multiplication, Edit Distance.
+- **Week 10:** Shortest Path Algorithms: Single-Source Shortest Paths (Dijkstra, Bellman-Ford), All-Pairs (Floyd-Warshall).
+- **Week 11:** Network Flow: Maximum Flow, Ford-Fulkerson method, Edmonds-Karp algorithm, Min-Cut Max-Flow Theorem.
+- **Week 12:** NP-Completeness: Polynomial-time verification, Reduction techniques, 3-SAT to Clique, Approximation Algorithms.`;
+
 /** @type {import('./contract.js').Course[]} */
 export const MOCK_COURSES = [
-  { id: 1, code: 'CSE 2101', title: 'Data Structures', credits: 3.0, semester: 'Fall 2024' },
-  { id: 2, code: 'CSE 2103', title: 'Algorithms', credits: 3.0, semester: 'Spring 2025' },
+  {
+    id: 1,
+    code: 'CSE 2101',
+    title: 'Data Structures',
+    credits: 3.0,
+    semester: 'Fall 2024',
+    syllabus_markdown: SYLLABUS_CSE_2101,
+  },
+  {
+    id: 2,
+    code: 'CSE 2103',
+    title: 'Algorithms',
+    credits: 3.0,
+    semester: 'Spring 2025',
+    syllabus_markdown: SYLLABUS_CSE_2103,
+  },
 ];
 
 /** @type {import('./contract.js').Exam[]} */
@@ -99,6 +160,135 @@ export const MOCK_EXAMS = [
     total_marks: 70,
   },
 ];
+
+/**
+ * Questions as authored, keyed by `exam_id` — the editable shape the Exam
+ * Moderation editor loads before it audits anything. Verbatim from the seeder.
+ *
+ * Exam 2 is the draft carrying the planted defects: Q2(a) is C1 recall tagged
+ * C4, Q4 repeats Fall 2024 Q4 verbatim, Q5(b) allocates 2 marks to a proof, and
+ * the marks sum to 72 against a declared 70.
+ *
+ * @type {Record<number, import('./contract.js').DraftQuestion[]>}
+ */
+export const MOCK_EXAM_QUESTIONS = {
+  1: [
+    {
+      q_number: '1',
+      text: 'Compare the internal memory overhead and pointer footprint of a singly linked list against a doubly linked list with clear illustrative diagrams.',
+      marks: 8,
+      assigned_bloom_level: 'C2',
+      assigned_clo: 'CLO1',
+    },
+    {
+      q_number: '2',
+      text: 'Execute step-by-step AVL tree insertions for the numerical sequence [45, 12, 89, 34, 70, 23]. Identify and illustrate every single rotation (LL, RR, LR, RL) performed.',
+      marks: 10,
+      assigned_bloom_level: 'C3',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '3',
+      text: 'Formulate an algorithm to parse and evaluate postfix arithmetic expressions using an explicit stack. Simulate execution on "12 4 / 5 + 3 *".',
+      marks: 8,
+      assigned_bloom_level: 'C3',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '4',
+      text: 'Given an undirected graph with 7 vertices and edges {(1,2),(1,3),(2,4),(2,5),(3,6),(3,7),(5,7)}, trace both Breadth-First Search (BFS) and Depth-First Search (DFS) traversals starting from vertex 1. Show the detailed state of the queue and stack data structures at every vertex visitation step.',
+      marks: 10,
+      assigned_bloom_level: 'C3',
+      assigned_clo: 'CLO3',
+    },
+    {
+      q_number: '5',
+      text: 'Critique and contrast linear probing versus quadratic probing collision resolution strategies in hash tables operating at load factor alpha >= 0.75. Explain secondary clustering effects.',
+      marks: 8,
+      assigned_bloom_level: 'C4',
+      assigned_clo: 'CLO3',
+    },
+    {
+      q_number: '6',
+      text: 'Evaluate whether an arbitrary binary tree fulfills Binary Search Tree (BST) invariants in O(n) time. Prove the correctness of using ancestor-derived min/max interval constraints.',
+      marks: 10,
+      assigned_bloom_level: 'C5',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '7',
+      text: 'Differentiate the asymptotic behavior of QuickSort under deterministic first-element pivot selection versus randomized median pivot selection on sorted arrays.',
+      marks: 8,
+      assigned_bloom_level: 'C4',
+      assigned_clo: 'CLO1',
+    },
+    {
+      q_number: '8',
+      text: 'Synthesize an optimal Least Recently Used (LRU) Cache data architecture combining a doubly linked list and a hash map. Provide pseudo-code for get(key) and put(key, value) maintaining strict O(1) time bounds.',
+      marks: 8,
+      assigned_bloom_level: 'C6',
+      assigned_clo: 'CLO4',
+    },
+  ],
+  2: [
+    {
+      q_number: '1',
+      text: 'Illustrate the internal pointer updates required to delete a node from the middle of a doubly linked list without causing memory leakage.',
+      marks: 10,
+      assigned_bloom_level: 'C2',
+      assigned_clo: 'CLO1',
+    },
+    {
+      q_number: '2(a)',
+      text: 'State the definition of an AVL tree and list the mathematical condition defining the balance factor of any arbitrary node.',
+      marks: 8,
+      assigned_bloom_level: 'C4',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '3',
+      text: 'Construct a circular queue of size 6 using an array. Show the exact front and rear index pointers after 4 enqueue and 2 dequeue operations.',
+      marks: 10,
+      assigned_bloom_level: 'C3',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '4',
+      text: 'Given an undirected graph with 7 vertices and edges {(1,2),(1,3),(2,4),(2,5),(3,6),(3,7),(5,7)}, trace both Breadth-First Search (BFS) and Depth-First Search (DFS) traversals starting from vertex 1. Show the detailed state of the queue and stack data structures at every vertex visitation step.',
+      marks: 10,
+      assigned_bloom_level: 'C3',
+      assigned_clo: 'CLO3',
+    },
+    {
+      q_number: '5(b)',
+      text: 'Derive and prove the time complexity of collision resolution by double hashing using probabilistic Bernoulli trial assumptions across an infinite key domain.',
+      marks: 2,
+      assigned_bloom_level: 'C4',
+      assigned_clo: 'CLO3',
+    },
+    {
+      q_number: '6',
+      text: 'Compute the depth, height, and sibling relationships of all nodes in a complete binary tree containing 15 keys stored sequentially in an array.',
+      marks: 12,
+      assigned_bloom_level: 'C3',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '7',
+      text: 'Deconstruct the worst-case time complexity of BST deletion when the target node possesses two children, accounting for in-order successor swapping.',
+      marks: 10,
+      assigned_bloom_level: 'C4',
+      assigned_clo: 'CLO2',
+    },
+    {
+      q_number: '8',
+      text: 'Analyze the memory footprint and edge-traversal cache locality of adjacency matrix versus adjacency list representations for dense graphs with V > 10,000.',
+      marks: 10,
+      assigned_bloom_level: 'C4',
+      assigned_clo: 'CLO1',
+    },
+  ],
+};
 
 /* ==========================================================================
  * DASHBOARD
@@ -601,6 +791,17 @@ export function resolveMock(method, url, body = {}) {
   const [path, search = ''] = url.split('?');
   const params = new URLSearchParams(search);
   const key = `${method.toLowerCase()} ${path}`;
+
+  // Parameterised paths cannot be switch cases — match them first.
+  const questionsOfExam = /^\/exams\/(\d+)\/questions$/.exec(path);
+  if (questionsOfExam && method.toLowerCase() === 'get') {
+    const examId = Number(questionsOfExam[1]);
+    const questions = MOCK_EXAM_QUESTIONS[examId];
+    if (!questions) {
+      throw { status: 404, message: `No exam found with id ${examId}.`, errors: null };
+    }
+    return { data: questions };
+  }
 
   switch (key) {
     case 'post /login': {

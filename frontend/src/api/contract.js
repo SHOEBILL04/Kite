@@ -70,6 +70,17 @@ export const ENDPOINTS = {
   courses: '/courses',
   /** GET -> {@link Exam}[] */
   exams: '/exams',
+  /**
+   * GET -> {@link DraftQuestion}[] — the paper as authored, in `q_number` order.
+   *
+   * `Exam` carries no questions, so the moderation editor needs this to load an
+   * existing paper before auditing it. Distinct from the audit response: these
+   * are the faculty's own values, with no `detected_bloom_level` or `verdict`.
+   *
+   * @param {number} examId
+   * @returns {string}
+   */
+  examQuestions: (examId) => `/exams/${examId}/questions`,
 
   // --- Audits -----------------------------------------------------------
   /** POST — body `{ course_id: number }` -> {@link GradingDriftReport} */
@@ -106,6 +117,8 @@ export const QUERY_KEYS = {
   dashboardSummary: ['dashboard', 'summary'],
   courses: ['courses'],
   exams: ['exams'],
+  /** @param {number} examId */
+  examQuestions: (examId) => ['exams', examId, 'questions'],
   /** @param {{module?: AuditModule, severity?: Severity}} [filters] */
   reports: (filters = {}) => ['reports', filters.module ?? null, filters.severity ?? null],
   /** @param {number} courseId */
@@ -208,6 +221,20 @@ export const QUERY_KEYS = {
  * @property {'Mid'|'Final'} exam_type
  * @property {'draft'|'moderated'|'approved'} status
  * @property {number} total_marks   declared total printed on the paper
+ */
+
+/**
+ * A question as the faculty authored it — the editable shape.
+ *
+ * `assigned_clo` is a free-form outcome label rather than an enum: each course
+ * declares its own set (CSE 2101 uses CLO1..CLO4).
+ *
+ * @typedef {Object} DraftQuestion
+ * @property {string} q_number              e.g. "2(a)" — string, not a number
+ * @property {string} text
+ * @property {number} marks
+ * @property {BloomLevel} assigned_bloom_level
+ * @property {string} assigned_clo          e.g. "CLO2"
  */
 
 /* ==========================================================================
