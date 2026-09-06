@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,11 +7,9 @@
     <script>
       (function() {
         try {
-          var saved = localStorage.getItem('cognifaculty-theme');
-          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var theme = saved || 'system';
-          var resolved = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
-          document.documentElement.setAttribute('data-theme', resolved);
+          localStorage.setItem('cognifaculty-theme', 'light');
+          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.classList.remove('dark');
         } catch (e) {}
       })();
     </script>
@@ -22,7 +20,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-slate-950">
+  <body class="bg-canvas text-primary antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
