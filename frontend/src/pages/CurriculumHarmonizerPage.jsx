@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -31,6 +31,7 @@ import { cn } from '../lib/cn.js';
 import { ratioPct } from '../lib/format.js';
 import { annotateSyllabus, scoreBand } from '../lib/syllabus.js';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard.js';
+import { useMediaQuery } from '../hooks/useMediaQuery.js';
 import {
   AiSummaryCard,
   Badge,
@@ -113,31 +114,6 @@ const TABS = [
   { id: 'missing', label: 'Missing Prerequisites' },
   { id: 'bloom', label: 'Bloom Coverage' },
 ];
-
-/* ==========================================================================
- * Local hooks
- * ======================================================================= */
-
-/**
- * Below 1024px the dual columns cannot both stay legible, so the diff collapses
- * into stacked accordions. Tailwind cannot express that swap — it is a change of
- * component, not of classes — so the breakpoint is read in JS.
- */
-function useMediaQuery(query) {
-  const [matches, setMatches] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(query).matches
-  );
-
-  useEffect(() => {
-    const list = window.matchMedia(query);
-    const onChange = (event) => setMatches(event.matches);
-    setMatches(list.matches);
-    list.addEventListener('change', onChange);
-    return () => list.removeEventListener('change', onChange);
-  }, [query]);
-
-  return matches;
-}
 
 /* ==========================================================================
  * Top bar
