@@ -15,6 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 
+import { USE_MOCK } from '../api/client.js';
 import { Badge, Button, KiteIcon } from '../components/ui/index.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { cn } from '../lib/cn.js';
