@@ -12,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // Every API response carries a `meta` block saying which path served
+        // it, so the UI can show Live / Cached / Fixture.
+        $middleware->api(append: [
+            \App\Http\Middleware\AttachApiMeta::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

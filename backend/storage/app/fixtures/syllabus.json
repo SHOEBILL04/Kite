@@ -1,0 +1,53 @@
+{
+    "alignment_score": 52,
+    "redundant_topics": [
+        {
+            "topic": "Graph traversal (BFS/DFS)",
+            "course_a_ref": "CSE 2101 · Week 11",
+            "course_b_ref": "CSE 2103 · Week 6",
+            "similarity": 0.5
+        },
+        {
+            "topic": "Recursion and the call stack",
+            "course_a_ref": "CSE 2101 · Week 7",
+            "course_b_ref": "CSE 2103 · Week 2",
+            "similarity": 0.38
+        },
+        {
+            "topic": "Asymptotic complexity analysis",
+            "course_a_ref": "CSE 2101 · Week 1",
+            "course_b_ref": "CSE 2103 · Week 1",
+            "similarity": 0.13
+        }
+    ],
+    "missing_prerequisites": [
+        {
+            "concept": "Heaps and heap-sort",
+            "assumed_in": "CSE 2103 · Week 5",
+            "never_introduced_in": "CSE 2101",
+            "severity": "high"
+        },
+        {
+            "concept": "Amortized analysis",
+            "assumed_in": "CSE 2103 · Week 4",
+            "never_introduced_in": "CSE 2101",
+            "severity": "medium"
+        }
+    ],
+    "bloom_coverage": {
+        "C1": 8,
+        "C2": 1,
+        "C3": 8,
+        "C4": 7,
+        "C5": 3,
+        "C6": 4
+    },
+    "actionable_changes": [
+        "Compress \"Graph traversal (BFS/DFS)\" in CSE 2103 (CSE 2103 · Week 6) to a one-session refresher; it is taught in full in CSE 2101 · Week 11.",
+        "Compress \"Recursion and the call stack\" in CSE 2103 (CSE 2103 · Week 2) to a one-session refresher; it is taught in full in CSE 2101 · Week 7.",
+        "Compress \"Asymptotic complexity analysis\" in CSE 2103 (CSE 2103 · Week 1) to a one-session refresher; it is taught in full in CSE 2101 · Week 1.",
+        "Introduce \"Heaps and heap-sort\" in CSE 2101 before CSE 2103 relies on it at CSE 2103 · Week 5.",
+        "Introduce \"Amortized analysis\" in CSE 2101 before CSE 2103 relies on it at CSE 2103 · Week 4."
+    ],
+    "ai_summary": "Alignment between CSE 2101 and CSE 2103 scores 52/100: 3 topic(s) are taught in both courses and 2 prerequisite concept(s) are assumed by CSE 2103 but never introduced in CSE 2101."
+}

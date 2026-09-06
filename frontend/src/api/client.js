@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { resolveMock } from './mock.js';
+import { recordApiMeta, recordMockMode, recordOffline } from './apiStatus.js';
 
 /**
  * The single HTTP entry point for the app.
@@ -87,10 +88,23 @@ apiClient.interceptors.response.use(
   // Unwrap the Laravel envelope. Endpoints that return a bare body still work.
   (response) => {
     const payload = response.data;
+
+    // The envelope is unwrapped here, so `meta` has to be captured on the way
+    // past or the ApiStatus badge would never see which path served this.
+    if (USE_MOCK) {
+      recordMockMode();
+    } else if (payload && typeof payload === 'object' && payload.meta) {
+      recordApiMeta(payload.meta);
+    }
+
     return payload && typeof payload === 'object' && 'data' in payload ? payload.data : payload;
   },
   (error) => {
     const status = error.response?.status ?? 0;
+
+    // Status 0 means the request never reached the API.
+    if (status === 0 && !USE_MOCK) recordOffline();
+
     const message =
       error.response?.data?.message ??
       (status === 0 ? 'Network unreachable. Is the API running?' : 'Request failed.');

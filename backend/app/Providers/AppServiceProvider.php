@@ -12,7 +12,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One telemetry recorder per request: AiClient writes which path served
+        // the work, AttachApiMeta stamps it onto the response envelope.
+        $this->app->singleton(\App\Services\Ai\AiTelemetry::class);
     }
 
     /**

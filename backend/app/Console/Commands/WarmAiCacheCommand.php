@@ -4,107 +4,86 @@ namespace App\Console\Commands;
 
 use App\Models\Course;
 use App\Models\Exam;
-use App\Models\Student;
-use App\Services\Ai\AiClient;
+use App\Services\Audit\ExamModerator;
+use App\Services\Audit\GradingDriftAnalyzer;
+use App\Services\Audit\SyllabusHarmonizer;
+use App\Services\Risk\RiskAnalyzer;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
+/**
+ * Warms the AI cache by running every audit exactly as the API runs it.
+ *
+ * The cache is keyed on a hash of the prompt the engine actually sends, so
+ * warming has to go through the engines themselves. Warming with hand-written
+ * prompts populates entries the live endpoints can never hit, and the demo
+ * still pays full model latency on stage.
+ */
 class WarmAiCacheCommand extends Command
 {
-    protected $signature = 'ai:warm {--force : Overwrite existing cached entries}';
-    protected $description = 'Pre-compute and populate ai_cache for all seeded demo audits so the demo serves with zero latency offline';
+    protected $signature = 'ai:warm
+                            {--force : Clear existing cache entries before warming}';
 
-    public function handle(AiClient $client): int
-    {
-        $this->info('Starting CogniFaculty AI Cache Warming…');
+    protected $description = 'Run every audit against seeded data so the AI cache is populated with the exact prompts the API uses';
 
-        $tasks = [
-            'grading-drift' => [
-                'system' => 'You are an academic auditor specializing in institutional grading parity.',
-                'user' => 'Audit grading variance for CSE 2101 between Section A and Section B.',
-                'schema' => [
-                    'type' => 'object',
-                    'required' => ['drift_detected', 'severity', 'section_stats', 'insights', 'normalization', 'ai_summary'],
-                    'properties' => [
-                        'drift_detected' => ['type' => 'boolean'],
-                        'severity' => ['type' => 'string', 'enum' => ['low', 'medium', 'high']],
-                        'section_stats' => ['type' => 'array'],
-                        'insights' => ['type' => 'array'],
-                        'normalization' => ['type' => 'object'],
-                        'ai_summary' => ['type' => 'string'],
-                    ],
-                ],
-            ],
-            'exam-moderation' => [
-                'system' => 'You are an academic examination moderator evaluating Bloom taxonomy balance and defect detection.',
-                'user' => 'Audit CSE 2101 Fall 2025 Final draft examination paper.',
-                'schema' => [
-                    'type' => 'object',
-                    'required' => ['mark_sum_valid', 'calculated_total', 'declared_total', 'questions', 'duplicates', 'cognitive_balance', 'ai_summary'],
-                    'properties' => [
-                        'mark_sum_valid' => ['type' => 'boolean'],
-                        'calculated_total' => ['type' => 'number'],
-                        'declared_total' => ['type' => 'number'],
-                        'questions' => ['type' => 'array'],
-                        'duplicates' => ['type' => 'array'],
-                        'cognitive_balance' => ['type' => 'object'],
-                        'ai_summary' => ['type' => 'string'],
-                    ],
-                ],
-            ],
-            'syllabus' => [
-                'system' => 'You are a university curriculum harmonizer assessing overlap and prerequisite alignment.',
-                'user' => 'Audit syllabus alignment between CSE 2101 (Data Structures) and CSE 2103 (Algorithms).',
-                'schema' => [
-                    'type' => 'object',
-                    'required' => ['alignment_score', 'redundant_topics', 'missing_prerequisites', 'bloom_coverage', 'actionable_changes', 'ai_summary'],
-                    'properties' => [
-                        'alignment_score' => ['type' => 'number'],
-                        'redundant_topics' => ['type' => 'array'],
-                        'missing_prerequisites' => ['type' => 'array'],
-                        'bloom_coverage' => ['type' => 'object'],
-                        'actionable_changes' => ['type' => 'array'],
-                        'ai_summary' => ['type' => 'string'],
-                    ],
-                ],
-            ],
-            'vulnerable-students' => [
-                'system' => 'You are an early-warning student retention auditor analyzing multi-signal disengagement.',
-                'user' => 'Audit student academic trajectories for CSE 2101 cohort.',
-                'schema' => [
-                    'type' => 'object',
-                    'required' => ['at_risk_count', 'students'],
-                    'properties' => [
-                        'at_risk_count' => ['type' => 'number'],
-                        'students' => ['type' => 'array'],
-                    ],
-                ],
-            ],
+    public function handle(
+        GradingDriftAnalyzer $grading,
+        SyllabusHarmonizer $syllabus,
+        ExamModerator $exams,
+        RiskAnalyzer $risk,
+    ): int {
+        if ($this->option('force')) {
+            DB::table('ai_cache')->delete();
+            $this->warn('Cleared ai_cache.');
+        }
+
+        $courseA = Course::orderBy('id')->first();
+        $courseB = Course::orderBy('id')->skip(1)->first();
+        $draftExam = Exam::where('status', 'draft')->first() ?? Exam::orderBy('id')->first();
+
+        if (! $courseA || ! $draftExam) {
+            $this->error('No seeded data found. Run `php artisan migrate:fresh --seed` first.');
+
+            return self::FAILURE;
+        }
+
+        $jobs = [
+            'grading-drift' => fn () => $grading->analyze($courseA->id),
+            'syllabus' => fn () => $syllabus->harmonise($courseA->id, ($courseB ?? $courseA)->id),
+            'exam-moderation' => fn () => $exams->moderate($draftExam->id),
+            'vulnerable-students' => fn () => $risk->analyze($courseA),
         ];
 
-        $rows = [];
+        $this->info('Warming AI cache against seeded data…');
+        $this->newLine();
 
-        foreach ($tasks as $taskName => $config) {
-            $this->output->write("  Warming [{$taskName}]… ");
-            $start = microtime(true);
+        $failed = 0;
 
-            $result = $client->run(
-                $taskName,
-                $config['system'],
-                $config['user'],
-                $config['schema']
-            );
+        foreach ($jobs as $task => $job) {
+            $startedAt = microtime(true);
 
-            $ms = (int) round((microtime(true) - $start) * 1000);
-            $hasData = !empty($result);
-
-            $this->output->writeln("<info>✓ DONE</info> ({$ms}ms)");
-            $rows[] = [$taskName, $hasData ? 'CACHED / OK' : 'FAILED', "{$ms} ms"];
+            try {
+                $job();
+                $ms = (int) round((microtime(true) - $startedAt) * 1000);
+                $this->line(sprintf('  <fg=green>✓</> %-22s warmed in %4d ms', $task, $ms));
+            } catch (Throwable $e) {
+                $failed++;
+                $this->line(sprintf('  <fg=red>✗</> %-22s %s', $task, $e->getMessage()));
+            }
         }
 
         $this->newLine();
-        $this->table(['Task', 'Status', 'Duration'], $rows);
-        $this->info('AI cache warming completed successfully. All demo responses are now cached locally in SQLite.');
+        $this->line('  ai_cache entries: '.DB::table('ai_cache')->count());
 
-        return Command::SUCCESS;
+        if ($failed > 0) {
+            $this->error("$failed task(s) failed to warm.");
+
+            return self::FAILURE;
+        }
+
+        $this->info('Cache warm. Run `php artisan ai:fixtures:dump` to freeze these as offline fixtures.');
+
+        return self::SUCCESS;
     }
 }

@@ -195,9 +195,12 @@ class GradingDriftAnalyzer
                 unset($s['mean_residual']); // Clean internal working variable
                 return $s;
             }, $sectionStats),
-            'insights' => $aiPayload['insights'] ?? [],
+            // Deterministic detection, AI explanation: the findings are computed
+            // from the statistics above and always present. The model may
+            // phrase them better, but it is never the reason they exist.
+            'insights' => $aiPayload['insights'] ?: $this->deterministicInsights($sectionStats, $ratio, $severity, $normalization),
             'normalization' => $normalization,
-            'ai_summary' => $aiPayload['ai_summary'] ?? '',
+            'ai_summary' => $this->usableSummary($aiPayload['ai_summary'] ?? '') ?: $this->deterministicSummary($sectionStats, $driftDetected, $normalization),
         ];
 
         // 7. PERSIST AUDIT REPORT RECORD
@@ -250,6 +253,109 @@ class GradingDriftAnalyzer
                 'ai_summary' => $fixture['ai_summary'] ?? '',
             ];
         }
+    }
+
+    /**
+     * A model summary is only usable if it actually says something. The AI
+     * layer emits a placeholder string when no fixture and no driver are
+     * available; shipping that to a judge would be worse than saying nothing.
+     */
+    protected function usableSummary(string $summary): string
+    {
+        $trimmed = trim($summary);
+
+        return ($trimmed === '' || str_contains(mb_strtolower($trimmed), 'default system fallback'))
+            ? ''
+            : $trimmed;
+    }
+
+    /**
+     * Findings derived straight from the computed statistics.
+     *
+     * These are what the module actually detected; the AI layer only rewrites
+     * them. With no API key the report is identical in substance.
+     *
+     * @return array<int, array{title:string, detail:string, severity:string}>
+     */
+    protected function deterministicInsights(array $sectionStats, float $ratio, string $severity, array $normalization): array
+    {
+        $insights = [];
+
+        $sorted = collect($sectionStats)->sortByDesc('leniency_index')->values();
+        $lenient = $sorted->first();
+        $harsh = $sorted->last();
+
+        if ($lenient && $harsh && $lenient['section_name'] !== $harsh['section_name']) {
+            $gap = $lenient['mean'] - $harsh['mean'];
+            $insights[] = [
+                'title' => 'Section mean gap between '.$lenient['section_name'].' and '.$harsh['section_name'],
+                'detail' => sprintf(
+                    '%s averages %.2f (leniency index %.2f) against %.2f in %s (leniency index %.2f) — a gap of %.2f marks on the same assessment. Identical cohorts should not diverge this far.',
+                    $lenient['section_name'], $lenient['mean'], $lenient['leniency_index'],
+                    $harsh['mean'], $harsh['section_name'], $harsh['leniency_index'],
+                    $gap
+                ),
+                'severity' => $severity,
+            ];
+        }
+
+        foreach ($sectionStats as $stat) {
+            if (abs($stat['z_score']) >= 0.5) {
+                $insights[] = [
+                    'title' => $stat['section_name'].' sits '.($stat['z_score'] > 0 ? 'above' : 'below').' the cohort mean',
+                    'detail' => sprintf(
+                        '%s (n=%d, instructor %s) has a z-score of %.2f against the cohort, with standard deviation %.2f and skewness %.2f.',
+                        $stat['section_name'], $stat['n'], $stat['instructor'],
+                        $stat['z_score'], $stat['std_dev'], $stat['skewness']
+                    ),
+                    'severity' => abs($stat['z_score']) >= 1.0 ? 'high' : 'medium',
+                ];
+            }
+        }
+
+        if ($ratio >= 2.0) {
+            $insights[] = [
+                'title' => 'Unequal spread between sections',
+                'detail' => sprintf(
+                    'The wider section varies %.2fx more than the tighter one, so the two graders are not only differing on average but on how far they spread marks.',
+                    $ratio
+                ),
+                'severity' => $ratio >= 3.0 ? 'high' : 'medium',
+            ];
+        }
+
+        $insights[] = [
+            'title' => 'Proposed normalisation',
+            'detail' => sprintf(
+                'A shift of %+.1f marks on %s realigns it with the cohort mean while preserving within-section rank order.',
+                $normalization['suggested_shift'], $normalization['section_name']
+            ),
+            'severity' => 'low',
+        ];
+
+        return $insights;
+    }
+
+    /**
+     * Summary sentence built from the computed numbers, used when no model
+     * response is available.
+     */
+    protected function deterministicSummary(array $sectionStats, bool $driftDetected, array $normalization): string
+    {
+        if (! $driftDetected) {
+            return 'No material grading drift detected between sections; all section means sit within the tolerance band of the cohort mean.';
+        }
+
+        $sorted = collect($sectionStats)->sortByDesc('leniency_index')->values();
+        $lenient = $sorted->first();
+        $harsh = $sorted->last();
+
+        return sprintf(
+            'Grading drift detected: %s averages %.2f marks against %.2f in %s on the same assessment, a leniency spread of %.2f versus %.2f. A %+.1f mark normalisation on %s is proposed.',
+            $lenient['section_name'], $lenient['mean'], $harsh['mean'], $harsh['section_name'],
+            $lenient['leniency_index'], $harsh['leniency_index'],
+            $normalization['suggested_shift'], $normalization['section_name']
+        );
     }
 
     protected function persistReport(int $courseId, array $report): void
