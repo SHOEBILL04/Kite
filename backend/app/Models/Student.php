@@ -23,6 +23,7 @@ class Student extends Model
         'assignment_delay_count',
         'risk_level',
         'risk_score',
+        'ml_probability',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ class Student extends Model
             'midterm_pct' => 'float',
             'assignment_delay_count' => 'integer',
             'risk_score' => 'integer',
+            'ml_probability' => 'float',
         ];
     }
 
