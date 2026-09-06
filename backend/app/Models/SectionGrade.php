@@ -12,6 +12,8 @@ class SectionGrade extends Model
 
     protected $fillable = [
         'course_id',
+        'grading_batch_id',
+        'grading_submission_id',
         'section_name',
         'faculty_id',
         'student_hash',
@@ -37,5 +39,15 @@ class SectionGrade extends Model
     public function faculty(): BelongsTo
     {
         return $this->belongsTo(User::class, 'faculty_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(GradingBatch::class, 'grading_batch_id');
+    }
+
+    public function submission(): BelongsTo
+    {
+        return $this->belongsTo(GradingSubmission::class, 'grading_submission_id');
     }
 }

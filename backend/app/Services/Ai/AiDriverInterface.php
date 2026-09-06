@@ -13,7 +13,7 @@ interface AiDriverInterface
      * @return array Decoded response matching schema
      * @throws \Throwable If network fails or rate limited
      */
-    public function json(string $system, string $user, array $schema): array;
+    public function json(string $system, string $user, array $schema, ?string $model = null): array;
 
     /**
      * Get prompt tokens consumed in the last call.
@@ -26,7 +26,7 @@ interface AiDriverInterface
     public function getLastTokensOut(): ?int;
 
     /**
-     * Driver name identifier (e.g. 'gemini', 'groq').
+     * Driver name identifier (currently always 'groq').
      */
     public function getDriverName(): string;
 }

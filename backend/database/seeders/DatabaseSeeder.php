@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Course;
 use App\Models\Exam;
+use App\Models\GradingBatch;
+use App\Models\GradingSubmission;
 use App\Models\ExamQuestion;
 use App\Models\SectionGrade;
 use App\Models\Student;
@@ -375,11 +377,49 @@ MD;
 
         SectionGrade::truncate();
         Student::truncate();
+        GradingSubmission::query()->delete();
+        GradingBatch::query()->delete();
+
+        // ---------------------------------------------------------------------
+        // GRADING BATCHES
+        // ---------------------------------------------------------------------
+        // The seeded marks predate the upload workflow, so they are backfilled
+        // into a batch that looks exactly as though both teachers had uploaded
+        // it. That keeps the one-click demo intact while making the upload path
+        // a live addition rather than a replacement.
+        $midTermBatch = GradingBatch::create([
+            'course_id' => $courseCSE2101->id,
+            'semester' => $courseCSE2101->semester,
+            'assessment_name' => 'Mid Term',
+            'max_marks' => 30,
+            'created_by' => $amina->id,
+            'status' => GradingBatch::STATUS_READY,
+        ]);
+
+        $submissionA = GradingSubmission::create([
+            'grading_batch_id' => $midTermBatch->id,
+            'section_name' => 'Section A',
+            'faculty_id' => $monir->id,
+            'student_count' => count($sectionAData),
+            'uploaded_at' => now()->subDays(3),
+            'file_name' => 'cse2101-section-a-midterm.csv',
+        ]);
+
+        $submissionB = GradingSubmission::create([
+            'grading_batch_id' => $midTermBatch->id,
+            'section_name' => 'Section B',
+            'faculty_id' => $facultyB->id,
+            'student_count' => count($sectionBData),
+            'uploaded_at' => now()->subDays(2),
+            'file_name' => 'cse2101-section-b-midterm.csv',
+        ]);
 
         // Seed Section A
         foreach ($sectionAData as $item) {
             SectionGrade::create([
                 'course_id' => $courseCSE2101->id,
+                'grading_batch_id' => $midTermBatch->id,
+                'grading_submission_id' => $submissionA->id,
                 'section_name' => 'Section A',
                 'faculty_id' => $monir->id,
                 'student_hash' => $item['hash'],
@@ -407,6 +447,8 @@ MD;
         foreach ($sectionBData as $item) {
             SectionGrade::create([
                 'course_id' => $courseCSE2101->id,
+                'grading_batch_id' => $midTermBatch->id,
+                'grading_submission_id' => $submissionB->id,
                 'section_name' => 'Section B',
                 'faculty_id' => $facultyB->id,
                 'student_hash' => $item['hash'],
@@ -427,6 +469,45 @@ MD;
                 'assignment_delay_count' => $item['late'],
                 'risk_level' => null,
                 'risk_score' => null,
+            ]);
+        }
+
+        // ---------------------------------------------------------------------
+        // A batch still waiting on its second section.
+        // ---------------------------------------------------------------------
+        // Gives the "waiting for other sections" state something real to render
+        // without anyone having to delete a submission mid-demo.
+        $finalBatch = GradingBatch::create([
+            'course_id' => $courseCSE2101->id,
+            'semester' => $courseCSE2101->semester,
+            'assessment_name' => 'Final Assessment',
+            'max_marks' => 40,
+            'created_by' => $amina->id,
+            'status' => GradingBatch::STATUS_COLLECTING,
+        ]);
+
+        $finalSubmissionA = GradingSubmission::create([
+            'grading_batch_id' => $finalBatch->id,
+            'section_name' => 'Section A',
+            'faculty_id' => $monir->id,
+            'student_count' => count($sectionAData),
+            'uploaded_at' => now()->subHours(6),
+            'file_name' => 'cse2101-section-a-final.csv',
+        ]);
+
+        // Section A's marks for the final, scaled to the 40-mark total. Section
+        // B has not uploaded, which is the point of this batch.
+        foreach ($sectionAData as $item) {
+            SectionGrade::create([
+                'course_id' => $courseCSE2101->id,
+                'grading_batch_id' => $finalBatch->id,
+                'grading_submission_id' => $finalSubmissionA->id,
+                'section_name' => 'Section A',
+                'faculty_id' => $monir->id,
+                'student_hash' => $item['hash'],
+                'mid_marks' => (int) round($item['mid'] * (40 / 30)),
+                'quiz_avg' => $item['q_avg'],
+                'attendance_pct' => $item['att'],
             ]);
         }
     }
