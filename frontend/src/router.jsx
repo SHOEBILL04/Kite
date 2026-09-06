@@ -27,7 +27,7 @@ export function ProtectedRoute({ roles, children }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
         <Spinner size="lg" label="Restoring session" />
       </div>
     );

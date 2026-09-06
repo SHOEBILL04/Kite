@@ -20,6 +20,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { ENDPOINTS, QUERY_KEYS, ROLE_LABELS } from '../api/contract.js';
 import { get } from '../api/client.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useTheme } from '../hooks/useTheme.js';
 import {
   Badge,
   Button,
@@ -57,13 +58,6 @@ const MODULE_MAP = {
   },
 };
 
-// Colors for Recharts donut: emerald / amber / rose
-const SEVERITY_COLORS = {
-  low: '#10b981',    // emerald-500
-  medium: '#f59e0b', // amber-500
-  high: '#f43f5e',   // rose-500
-};
-
 function getTimeGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -91,14 +85,14 @@ function CustomTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const item = payload[0];
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs shadow-xl">
+    <div className="rounded-[8px] border border-border-default bg-surface px-3 py-2 text-xs shadow-elevation">
       <div className="flex items-center gap-2">
         <span
           className="h-2.5 w-2.5 rounded-full"
           style={{ backgroundColor: item.payload.color }}
         />
-        <span className="font-medium text-slate-200">{item.name} Severity:</span>
-        <span className="font-mono font-semibold text-slate-100">{item.value}</span>
+        <span className="font-medium text-secondary">{item.name} Severity:</span>
+        <span className="font-mono font-semibold text-primary">{item.value}</span>
       </div>
     </div>
   );
@@ -106,6 +100,7 @@ function CustomTooltip({ active, payload }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { resolved } = useTheme();
   const navigate = useNavigate();
 
   const {
@@ -121,6 +116,10 @@ export default function Dashboard() {
 
   const greeting = useMemo(() => getTimeGreeting(), []);
 
+  const SEVERITY_COLORS = useMemo(() => {
+    return { low: 'var(--pass-text)', medium: 'var(--warning-text)', high: 'var(--critical-text)' };
+  }, []);
+
   // Compute severity data for Recharts donut
   const { donutData, totalSeverityCount } = useMemo(() => {
     const sb = summary?.severity_breakdown ?? { low: 0, medium: 0, high: 0 };
@@ -135,113 +134,60 @@ export default function Dashboard() {
         { name: 'Low', value: low, color: SEVERITY_COLORS.low, key: 'low' },
         { name: 'Medium', value: medium, color: SEVERITY_COLORS.medium, key: 'medium' },
         { name: 'High', value: high, color: SEVERITY_COLORS.high, key: 'high' },
-      ],
+      ].filter((d) => d.value > 0),
     };
-  }, [summary]);
+  }, [summary, SEVERITY_COLORS]);
 
-  // Loading Skeleton State
   if (isLoading) {
     return (
       <div className="space-y-6">
-        {/* Greeting Skeleton */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-7 w-64" />
-            <Skeleton className="h-4 w-40" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-6 w-24 rounded-full" />
-            <Skeleton className="h-6 w-32 rounded-full" />
-          </div>
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-96" />
         </div>
-
-        {/* 4 StatCards Skeleton */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-              <div className="flex justify-between">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-4 w-4 rounded-full" />
-              </div>
-              <Skeleton className="mt-2 h-8 w-16" />
-              <Skeleton className="mt-2 h-3 w-32" />
-            </div>
-          ))}
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
         </div>
-
-        {/* Quick Actions Skeleton */}
-        <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-          <Skeleton className="mb-3 h-4 w-36" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-9 w-full rounded-lg" />
-            ))}
-          </div>
-        </div>
-
-        {/* Two-Column Skeleton */}
+        <Skeleton className="h-20" />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-5">
-            <Card>
-              <CardHeader title="Severity Breakdown" icon={PieIcon} />
-              <CardBody className="flex flex-col items-center justify-center p-6">
-                <Skeleton className="h-48 w-48 rounded-full" />
-                <div className="mt-4 flex gap-4">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-          <div className="lg:col-span-7">
-            <Card>
-              <CardHeader title="Recent Findings" icon={Sparkles} />
-              <CardBody className="space-y-3 p-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full rounded-md" />
-                ))}
-              </CardBody>
-            </Card>
-          </div>
+          <Skeleton className="h-80 lg:col-span-5" />
+          <Skeleton className="h-80 lg:col-span-7" />
         </div>
       </div>
     );
   }
 
-  // Error State with Inline Retry Card
   if (isError) {
     return (
-      <div className="space-y-6">
-        <Card className="border-rose-900/50 bg-rose-950/20">
-          <CardHeader
-            icon={AlertTriangle}
-            title="Failed to load dashboard summary"
-            subtitle={error?.message ?? 'Network unreachable or service unavailable.'}
-          />
-          <CardBody className="p-6">
-            <p className="text-sm text-slate-400">
-              Could not fetch the latest quality audit metrics. You can try refreshing the data.
-            </p>
-            <div className="mt-4 flex gap-3">
-              <Button variant="primary" size="sm" onClick={() => refetch()} icon={RefreshCw}>
-                Retry Fetch
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+      <Card>
+        <CardBody className="p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-critical-bg text-critical-text">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <h2 className="mt-4 text-base font-semibold text-heading">
+            Failed to load dashboard summary
+          </h2>
+          <p className="mt-1 text-xs text-secondary max-w-sm mx-auto">
+            {error?.message ?? 'The backend API did not respond with dashboard metrics.'}
+          </p>
+          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => refetch()} className="mt-4">
+            Retry Loading
+          </Button>
+        </CardBody>
+      </Card>
     );
   }
 
-  // Empty State (No summary data at all)
   if (!summary) {
     return (
       <Card>
         <EmptyState
-          title="No Audit Data Available"
-          description="The platform does not have any active course or exam findings loaded."
-          actionLabel="Load Demo Data"
+          title="No summary metrics available"
+          description="Click retry or check backend seed database connection."
+          actionLabel="Retry"
           onAction={() => refetch()}
         />
       </Card>
@@ -256,11 +202,11 @@ export default function Dashboard() {
       <section aria-label="Greeting Header" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-slate-100 sm:text-2xl">
+            <h1 className="text-xl font-bold tracking-tight text-heading sm:text-2xl">
               {greeting}, {user?.name ?? 'Dr. Amina'}
             </h1>
           </div>
-          <p className="text-xs text-slate-400 sm:text-sm">
+          <p className="text-xs text-muted sm:text-sm">
             Continuous academic quality audit posture and cross-sectional monitoring.
           </p>
         </div>
@@ -270,8 +216,8 @@ export default function Dashboard() {
             {ROLE_LABELS[user?.role] ?? 'Faculty'}
           </Badge>
 
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300 shadow-sm">
-            <Calendar className="h-3.5 w-3.5 text-amber-400" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border-default bg-surface px-3 py-1 text-xs font-medium text-secondary shadow-elevation">
+            <Calendar className="h-3.5 w-3.5 text-green-500" />
             <span>Fall 2025 / Spring 2026</span>
           </span>
         </div>
@@ -325,70 +271,70 @@ export default function Dashboard() {
       </section>
 
       {/* 3. RUN AN AUDIT QUICK-ACTION BAR */}
-      <section aria-label="Quick Action Audits" className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 shadow-sm">
+      <section aria-label="Quick Action Audits" className="rounded-[8px] border border-border-default bg-surface p-4 shadow-elevation">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Sparkles className="h-4 w-4 text-green-500" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
               Run an Audit
             </h2>
           </div>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-muted">
             One-click automated analysis
           </span>
         </div>
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => navigate('/grading-parity?autorun=1')}
-            className="group flex w-full items-center justify-between border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 hover:border-amber-400/40 hover:bg-slate-800/60"
+            className="group flex w-full items-center justify-between border border-border-default bg-subtle px-3 py-2.5 hover:bg-hover"
           >
-            <span className="flex items-center gap-2 truncate text-slate-200 group-hover:text-amber-300">
-              <Scale className="h-4 w-4 shrink-0 text-amber-400" />
+            <span className="flex items-center gap-2 truncate text-primary">
+              <Scale className="h-4 w-4 shrink-0 text-green-500" />
               <span className="truncate text-xs font-medium">Grading Parity</span>
             </span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-amber-400" />
+            <ArrowUpRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
           </Button>
 
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => navigate('/exam-moderation?autorun=1')}
-            className="group flex w-full items-center justify-between border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 hover:border-amber-400/40 hover:bg-slate-800/60"
+            className="group flex w-full items-center justify-between border border-border-default bg-subtle px-3 py-2.5 hover:bg-hover"
           >
-            <span className="flex items-center gap-2 truncate text-slate-200 group-hover:text-amber-300">
-              <FileSearch className="h-4 w-4 shrink-0 text-amber-400" />
+            <span className="flex items-center gap-2 truncate text-primary">
+              <FileSearch className="h-4 w-4 shrink-0 text-green-500" />
               <span className="truncate text-xs font-medium">Exam Moderation</span>
             </span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-amber-400" />
+            <ArrowUpRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
           </Button>
 
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => navigate('/curriculum-harmonizer?autorun=1')}
-            className="group flex w-full items-center justify-between border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 hover:border-amber-400/40 hover:bg-slate-800/60"
+            className="group flex w-full items-center justify-between border border-border-default bg-subtle px-3 py-2.5 hover:bg-hover"
           >
-            <span className="flex items-center gap-2 truncate text-slate-200 group-hover:text-amber-300">
-              <GitCompare className="h-4 w-4 shrink-0 text-amber-400" />
+            <span className="flex items-center gap-2 truncate text-primary">
+              <GitCompare className="h-4 w-4 shrink-0 text-green-500" />
               <span className="truncate text-xs font-medium">Curriculum Harmonizer</span>
             </span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-amber-400" />
+            <ArrowUpRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
           </Button>
 
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => navigate('/student-radar?autorun=1')}
-            className="group flex w-full items-center justify-between border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 hover:border-amber-400/40 hover:bg-slate-800/60"
+            className="group flex w-full items-center justify-between border border-border-default bg-subtle px-3 py-2.5 hover:bg-hover"
           >
-            <span className="flex items-center gap-2 truncate text-slate-200 group-hover:text-amber-300">
-              <Radar className="h-4 w-4 shrink-0 text-amber-400" />
+            <span className="flex items-center gap-2 truncate text-primary">
+              <Radar className="h-4 w-4 shrink-0 text-green-500" />
               <span className="truncate text-xs font-medium">Student Radar</span>
             </span>
-            <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-amber-400" />
+            <ArrowUpRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
           </Button>
         </div>
       </section>
@@ -424,7 +370,7 @@ export default function Dashboard() {
                           outerRadius={88}
                           paddingAngle={4}
                           dataKey="value"
-                          stroke="#0f172a"
+                          stroke="var(--bg-surface)"
                           strokeWidth={2}
                         >
                           {donutData.map((entry) => (
@@ -436,43 +382,43 @@ export default function Dashboard() {
 
                     {/* Centered Total Label */}
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-3xl font-bold tabular-nums tracking-tight text-slate-100">
+                      <span className="text-3xl font-bold tabular-nums tracking-tight text-heading">
                         {totalSeverityCount}
                       </span>
-                      <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
                         Total Issues
                       </span>
                     </div>
                   </div>
 
                   {/* Breakdown Legend */}
-                  <div className="mt-4 grid w-full grid-cols-3 gap-2 border-t border-slate-800/80 pt-4 text-center">
-                    <div className="rounded-lg border border-slate-800/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <div className="mt-4 grid w-full grid-cols-3 gap-2 border-t border-border-default pt-4 text-center">
+                    <div className="rounded-[8px] border border-border-default bg-subtle p-2">
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-pass-text">
+                        <span className="h-2 w-2 rounded-full bg-pass-text" />
                         <span className="font-medium">Low</span>
                       </div>
-                      <div className="mt-1 text-base font-semibold tabular-nums text-slate-200">
+                      <div className="mt-1 text-base font-semibold tabular-nums text-primary">
                         {summary.severity_breakdown.low}
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-slate-800/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center justify-center gap-1.5 text-xs text-amber-400">
-                        <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    <div className="rounded-[8px] border border-border-default bg-subtle p-2">
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-warning-text">
+                        <span className="h-2 w-2 rounded-full bg-warning-text" />
                         <span className="font-medium">Medium</span>
                       </div>
-                      <div className="mt-1 text-base font-semibold tabular-nums text-slate-200">
+                      <div className="mt-1 text-base font-semibold tabular-nums text-primary">
                         {summary.severity_breakdown.medium}
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-slate-800/60 bg-slate-950/40 p-2">
-                      <div className="flex items-center justify-center gap-1.5 text-xs text-rose-400">
-                        <span className="h-2 w-2 rounded-full bg-rose-500" />
+                    <div className="rounded-[8px] border border-border-default bg-subtle p-2">
+                      <div className="flex items-center justify-center gap-1.5 text-xs text-critical-text">
+                        <span className="h-2 w-2 rounded-full bg-critical-text" />
                         <span className="font-medium">High</span>
                       </div>
-                      <div className="mt-1 text-base font-semibold tabular-nums text-slate-200">
+                      <div className="mt-1 text-base font-semibold tabular-nums text-primary">
                         {summary.severity_breakdown.high}
                       </div>
                     </div>
@@ -491,7 +437,7 @@ export default function Dashboard() {
               title="Recent Findings"
               subtitle="Latest anomalies detected across active modules"
               action={
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-muted">
                   Showing {recentReports.length} results
                 </span>
               }
@@ -506,7 +452,7 @@ export default function Dashboard() {
                   onAction={() => navigate('/grading-parity?autorun=1')}
                 />
               ) : (
-                <ul className="divide-y divide-slate-800/80">
+                <ul className="divide-y divide-border-default">
                   {recentReports.map((report) => {
                     const mod = MODULE_MAP[report.module] ?? {
                       title: 'General',
@@ -520,22 +466,22 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => navigate(mod.path)}
-                          className="group flex w-full items-start gap-3.5 p-4 text-left transition-colors hover:bg-slate-800/40 focus:bg-slate-800/50 focus:outline-none"
+                          className="group flex w-full items-start gap-3.5 p-4 text-left transition-colors hover:bg-hover cursor-pointer"
                         >
-                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-950 text-slate-400 group-hover:border-slate-700 group-hover:text-amber-400">
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-border-default bg-subtle text-green-500">
                             <ModIcon className="h-4 w-4" strokeWidth={1.75} />
                           </span>
 
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="truncate text-xs font-semibold text-slate-200 group-hover:text-amber-300">
+                              <span className="truncate text-xs font-semibold text-heading group-hover:text-primary">
                                 {report.title}
                               </span>
                               <SeverityPill severity={report.severity} />
                             </div>
 
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                              <span className="font-medium text-slate-400">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+                              <span className="font-medium text-secondary">
                                 {report.subject}
                               </span>
                               <span>•</span>
@@ -543,7 +489,7 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-300" />
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                         </button>
                       </li>
                     );

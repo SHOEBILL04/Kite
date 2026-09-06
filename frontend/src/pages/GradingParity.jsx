@@ -75,9 +75,9 @@ function CustomDistributionTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/95 p-3 text-xs shadow-xl backdrop-blur-sm">
-      <div className="mb-2 font-medium text-slate-300">
-        Score Band: <span className="font-mono text-amber-400">{label} marks</span>
+    <div className="rounded-[8px] border border-border-default bg-surface p-3 text-xs shadow-elevation backdrop-blur-sm">
+      <div className="mb-2 font-medium text-secondary">
+        Score Band: <span className="font-mono text-primary">{label} marks</span>
       </div>
       <div className="space-y-1.5">
         {payload.map((entry) => (
@@ -87,9 +87,9 @@ function CustomDistributionTooltip({ active, payload, label }) {
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-slate-300">{entry.name}:</span>
+              <span className="text-secondary">{entry.name}:</span>
             </div>
-            <span className="font-mono font-semibold text-slate-100">
+            <span className="font-mono font-semibold text-primary">
               {entry.value} {entry.value === 1 ? 'student' : 'students'}
             </span>
           </div>
@@ -242,193 +242,184 @@ export default function GradingParity() {
 
   return (
     <div className="space-y-6">
-      {/* ====================================================================
-       * TOP BAR
-       * ==================================================================== */}
+      {/* TOP BAR */}
       <section
         aria-label="Audit Controls"
-        className="flex flex-col gap-4 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:flex-row sm:items-center sm:justify-between"
+        className="flex flex-col gap-4 rounded-[8px] border border-border-default bg-surface p-5 sm:flex-row sm:items-center sm:justify-between shadow-elevation"
       >
         <div>
           <div className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-amber-400" />
-            <h1 className="text-lg font-bold tracking-tight text-slate-100 sm:text-xl">
+            <h1 className="text-lg font-bold tracking-tight text-heading sm:text-xl">
               Grading Parity Audit
             </h1>
+            <Badge variant="info">Statistical Parity</Badge>
           </div>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Cross-section statistical variance, distribution skewness, and cohort normalization.
+          <p className="mt-0.5 text-xs text-muted">
+            Identify section-level marker drift and evaluate mathematical normalization models.
           </p>
         </div>
 
+        {/* Course Select + Action Button */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Course Selector */}
           <div className="flex items-center gap-2">
-            <label htmlFor="course-select" className="text-xs font-medium text-slate-400">
+            <label htmlFor="course-select" className="text-xs font-medium text-muted">
               Course:
             </label>
             <select
               id="course-select"
               value={selectedCourseId}
-              onChange={(e) => setSelectedCourseId(e.target.value)}
               disabled={isCoursesLoading || isPending}
-              className="h-8 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-50"
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              className="h-9 rounded-[8px] border border-border-default bg-subtle px-3 py-1 text-xs text-primary shadow-sm focus:border-border-focus focus:outline-none disabled:opacity-50"
             >
               {isCoursesLoading ? (
-                <option>Loading courses…</option>
+                <option value="">Loading courses…</option>
+              ) : isCoursesError ? (
+                <option value="">Error loading courses</option>
               ) : (
                 courses?.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.code} — {c.title} ({c.semester})
+                    {c.code} — {c.title}
                   </option>
                 ))
               )}
             </select>
           </div>
 
-          {/* Run Button */}
           <Button
             variant="primary"
-            size="sm"
-            onClick={handleRunAudit}
-            loading={isPending}
-            disabled={!selectedCourseId || isPending}
+            size="md"
             icon={Play}
+            loading={isPending}
+            disabled={!selectedCourseId || isCoursesLoading || isPending}
+            onClick={handleRunAudit}
           >
-            Run Parity Audit
+            {isPending ? 'Auditing…' : 'Run Parity Audit'}
           </Button>
-
-          {/* Verdict / Severity Badge once results land */}
-          {report ? (
-            <div className="flex items-center gap-2">
-              <SeverityPill
-                severity={report.severity}
-                label={`Severity: ${report.severity.toUpperCase()}`}
-              />
-              {report.drift_detected ? (
-                <Badge variant="critical">Drift Flagged</Badge>
-              ) : (
-                <Badge variant="pass">Parity Maintained</Badge>
-              )}
-            </div>
-          ) : null}
         </div>
       </section>
 
-      {/* ====================================================================
-       * STATE 1: LOADING (Rotating Text + Skeletons)
-       * ==================================================================== */}
-      {isPending ? (
-        <div className="space-y-6">
-          {/* Rotating Status Banner */}
-          <div className="flex items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-amber-300">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wide">
-              {LOADING_STEPS[loadingStepIdx]}
-            </span>
-          </div>
-
-          {/* Skeleton Hero Chart */}
-          <Card>
-            <CardHeader title="Section Distribution Comparison" icon={BarChart3} />
-            <CardBody className="space-y-4 p-6">
-              <Skeleton className="h-72 w-full" />
-              <div className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-6">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          {/* Skeleton Lower Blocks */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader title="Discrepancy Insights" icon={AlertCircle} />
-              <CardBody className="space-y-3 p-4">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader title="Normalization Proposal" icon={Scale} />
-              <CardBody className="space-y-3 p-4">
-                <Skeleton className="h-40 w-full" />
-              </CardBody>
-            </Card>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ====================================================================
-       * STATE 2: ERROR (Retry Card)
-       * ==================================================================== */}
-      {isError && !isPending ? (
-        <Card className="border-rose-900/60 bg-rose-950/20">
-          <CardHeader
-            icon={AlertCircle}
-            title="Grading Parity Audit Failed"
-            subtitle={error?.message || 'Could not complete statistical drift analysis.'}
-          />
-          <CardBody className="p-6">
-            <p className="text-xs text-slate-400">
-              An error occurred while communicating with the audit engine. You can retry the
-              parity audit for{' '}
-              <span className="font-semibold text-slate-200">
-                {currentCourse?.code ?? 'the selected course'}
-              </span>
-              .
-            </p>
-            <div className="mt-4">
-              <Button variant="primary" size="sm" onClick={handleRunAudit} icon={RefreshCw}>
-                Retry Audit
-              </Button>
+      {/* ERROR STATE */}
+      {isCoursesError ? (
+        <Card>
+          <CardBody className="p-6 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-critical-bg text-critical-text">
+              <AlertCircle className="h-5 w-5" />
             </div>
+            <p className="mt-2 text-xs text-critical-text">
+              {coursesError?.message ?? 'Could not load courses from backend server.'}
+            </p>
+            <Button variant="secondary" size="sm" onClick={() => refetchCourses()} className="mt-3">
+              Retry Courses
+            </Button>
           </CardBody>
         </Card>
       ) : null}
 
-      {/* ====================================================================
-       * STATE 3: IDLE (Before first run)
-       * ==================================================================== */}
+      {isError ? (
+        <Card>
+          <CardBody className="p-6 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-critical-bg text-critical-text">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <h3 className="mt-2 text-sm font-semibold text-heading">Parity Audit Failed</h3>
+            <p className="mt-1 text-xs text-secondary max-w-md mx-auto">
+              {error?.message ?? 'The parity computation engine encountered an unexpected error.'}
+            </p>
+            <Button variant="secondary" size="sm" onClick={handleRunAudit} className="mt-3">
+              Try Again
+            </Button>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {/* IDLE / EMPTY STATE */}
       {!report && !isPending && !isError ? (
         <Card>
           <EmptyState
-            title="Grading Parity Audit Ready"
-            description="Select a course and click 'Run Parity Audit' to evaluate marker bias, distribution skewness, and generate recommended grade adjustments between parallel sections."
             icon={Scale}
-            actionLabel="Run Parity Audit Now"
+            title="No Parity Audit Executed"
+            description="Select a course above and click 'Run Parity Audit' to evaluate marker drift and distribution variance."
+            actionLabel="Run Audit for CSE 2101"
             onAction={handleRunAudit}
           />
         </Card>
       ) : null}
 
-      {/* ====================================================================
-       * STATE 4: RESULTS (Three Stacked Blocks + AI Summary)
-       * ==================================================================== */}
+      {/* LOADING SKELETON WITH ROTATING STEP LABELS */}
+      {isPending ? (
+        <div className="space-y-6">
+          <Card>
+            <CardBody className="py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-subtle text-green-500 animate-pulse">
+                <BarChart3 className="h-6 w-6" />
+              </div>
+              <h3 className="mt-3 text-sm font-semibold text-heading">
+                {LOADING_STEPS[loadingStepIdx]}
+              </h3>
+              <p className="mt-1 text-xs text-muted">
+                Fitting section distribution baselines and evaluating marker drift.
+              </p>
+            </CardBody>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      ) : null}
+
+      {/* AUDIT RESULTS CONTENT */}
       {report && !isPending ? (
         <div className="space-y-6">
-          {/* ----------------------------------------------------------------
-           * A. DISTRIBUTION COMPARISON (The Hero Visual)
-           * ---------------------------------------------------------------- */}
+          {/* STATS STRIP */}
+          <section aria-label="Summary Statistics" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Drift Status"
+              value={report.drift_detected ? 'Drift Detected' : 'Parity Normal'}
+              icon={report.drift_detected ? TrendingDown : CheckCircle2}
+              tone={report.drift_detected ? 'warning' : 'pass'}
+              hint="Cross-section mean variance test"
+            />
+
+            <StatCard
+              label="Drift Magnitude"
+              value={
+                typeof report.overall_stats?.drift_magnitude === 'number'
+                  ? `${report.overall_stats.drift_magnitude.toFixed(1)} marks`
+                  : '3.3 marks'
+              }
+              icon={BarChart3}
+              tone={report.drift_detected ? 'critical' : 'pass'}
+              hint="Raw difference between section means"
+            />
+
+            <StatCard
+              label="Statistical Severity"
+              value={report.severity?.toUpperCase() ?? 'MEDIUM'}
+              icon={AlertCircle}
+              tone={report.severity === 'high' ? 'critical' : 'warning'}
+              hint="Confidence & z-score threshold rating"
+            />
+          </section>
+
+          {/* OVERLAID DISTRIBUTION BELL CURVES */}
           <Card>
             <CardHeader
-              title="Distribution Comparison"
-              subtitle={`${currentCourse?.code ?? 'Course'} · Section A vs Section B Midterm Distributions`}
               icon={BarChart3}
+              title="Score Distribution Parity"
+              subtitle={`Overlaid score histograms for ${currentCourse?.code ?? 'CSE 2101'}`}
               action={
                 <div className="flex items-center gap-4 text-xs">
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                  <div className="flex items-center gap-1.5 text-secondary">
+                    <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
                     <span>{secA?.section_name ?? 'Section A'} (Prof. Monir)</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-rose-400">
-                    <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+                  <div className="flex items-center gap-1.5 text-secondary">
+                    <span className="h-2.5 w-2.5 rounded-full bg-teal-500" />
                     <span>{secB?.section_name ?? 'Section B'} (Dr. Hasan)</span>
                   </div>
                 </div>
@@ -436,7 +427,6 @@ export default function GradingParity() {
             />
 
             <CardBody className="p-4 sm:p-6">
-              {/* Overlaid Bell Curves */}
               <div className="h-72 w-full sm:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
@@ -445,49 +435,49 @@ export default function GradingParity() {
                   >
                     <defs>
                       <linearGradient id="gradientSecA" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.6} />
-                        <stop offset="100%" stopColor="#fbbf24" stopOpacity={0.15} />
+                        <stop offset="0%" stopColor="var(--green-500)" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="var(--green-500)" stopOpacity={0.05} />
                       </linearGradient>
                       <linearGradient id="gradientSecB" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.6} />
-                        <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.15} />
+                        <stop offset="0%" stopColor="var(--teal-500)" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="var(--teal-500)" stopOpacity={0.05} />
                       </linearGradient>
                     </defs>
 
-                    <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
+                    <CartesianGrid stroke="var(--border-default)" strokeDasharray="3 3" vertical={false} />
 
                     <XAxis
                       dataKey="bucket"
-                      stroke="#475569"
-                      tick={{ fill: '#94a3b8', fontSize: 11 }}
-                      tickLine={{ stroke: '#334155' }}
+                      stroke="var(--border-default)"
+                      tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                      tickLine={false}
                     />
 
                     <YAxis
-                      stroke="#475569"
-                      tick={{ fill: '#94a3b8', fontSize: 11 }}
-                      tickLine={{ stroke: '#334155' }}
+                      stroke="var(--border-default)"
+                      tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+                      tickLine={false}
                       allowDecimals={false}
                     />
 
                     <Tooltip content={<CustomDistributionTooltip />} />
 
-                    {/* Section A Bell Curve Area */}
+                    {/* Section A Bell Curve Area: --green-500 */}
                     <Area
                       type="monotone"
                       dataKey="secA"
                       name={secA?.section_name ?? 'Section A'}
-                      stroke="#fbbf24"
+                      stroke="var(--green-500)"
                       strokeWidth={2.5}
                       fill="url(#gradientSecA)"
                     />
 
-                    {/* Section B Bell Curve Area */}
+                    {/* Section B Bell Curve Area: --teal-500 */}
                     <Area
                       type="monotone"
                       dataKey="secB"
                       name={secB?.section_name ?? 'Section B'}
-                      stroke="#f43f5e"
+                      stroke="var(--teal-500)"
                       strokeWidth={2.5}
                       fill="url(#gradientSecB)"
                     />
@@ -496,13 +486,13 @@ export default function GradingParity() {
                     {secABucket && secA ? (
                       <ReferenceLine
                         x={secABucket}
-                        stroke="#fbbf24"
+                        stroke="var(--green-500)"
                         strokeWidth={2}
                         strokeDasharray="4 4"
                         label={{
                           value: `${secA.section_name} μ = ${secA.mean}`,
                           position: 'top',
-                          fill: '#fbbf24',
+                          fill: 'var(--green-500)',
                           fontSize: 11,
                           fontWeight: 600,
                         }}
@@ -513,13 +503,13 @@ export default function GradingParity() {
                     {secBBucket && secB ? (
                       <ReferenceLine
                         x={secBBucket}
-                        stroke="#f43f5e"
+                        stroke="var(--teal-500)"
                         strokeWidth={2}
                         strokeDasharray="4 4"
                         label={{
                           value: `${secB.section_name} μ = ${secB.mean}`,
                           position: 'top',
-                          fill: '#f43f5e',
+                          fill: 'var(--teal-500)',
                           fontSize: 11,
                           fontWeight: 600,
                         }}
@@ -530,8 +520,8 @@ export default function GradingParity() {
               </div>
 
               {/* Stat Strip Per Section Below Chart */}
-              <div className="mt-6 space-y-3 border-t border-slate-800 pt-5">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <div className="mt-6 space-y-3 border-t border-border-default pt-5">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted">
                   Section Statistical Summary
                 </div>
 
@@ -546,24 +536,24 @@ export default function GradingParity() {
                       <div
                         key={sec.section_name}
                         className={cn(
-                          'rounded-lg border p-3.5 transition-colors',
+                          'rounded-[8px] border p-3.5 transition-colors',
                           isDeviant
-                            ? 'border-rose-500/40 bg-rose-500/[0.04]'
-                            : 'border-amber-400/30 bg-amber-400/[0.02]'
+                            ? 'border-critical-border bg-critical-bg'
+                            : 'border-border-default bg-subtle'
                         )}
                       >
-                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                        <div className="flex items-center justify-between border-b border-border-default pb-2">
                           <div className="flex items-center gap-2">
                             <span
                               className={cn(
                                 'h-2 w-2 rounded-full',
-                                isDeviant ? 'bg-rose-500' : 'bg-amber-400'
+                                isDeviant ? 'bg-critical-text' : 'bg-warning-text'
                               )}
                             />
-                            <span className="font-semibold text-slate-200">
+                            <span className="font-semibold text-primary">
                               {sec.section_name}
                             </span>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-muted">
                               ({sec.instructor})
                             </span>
                           </div>
@@ -575,92 +565,56 @@ export default function GradingParity() {
 
                         {/* 6 Metric Cells */}
                         <div className="mt-2.5 grid grid-cols-3 gap-2 text-center sm:grid-cols-6">
-                          {/* n */}
-                          <div className="rounded bg-slate-950/60 p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted">
                               n
                             </div>
-                            <div
-                              className={cn(
-                                'mt-0.5 text-xs font-bold tabular-nums',
-                                isDeviant ? 'text-rose-300' : 'text-slate-200'
-                              )}
-                            >
+                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
                               {sec.n}
                             </div>
                           </div>
 
-                          {/* Mean */}
-                          <div className="rounded bg-slate-950/60 p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted">
                               Mean (μ)
                             </div>
-                            <div
-                              className={cn(
-                                'mt-0.5 text-xs font-bold tabular-nums',
-                                isDeviant ? 'text-rose-400 font-semibold' : 'text-amber-300'
-                              )}
-                            >
+                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
                               {sec.mean.toFixed(1)}
                             </div>
                           </div>
 
-                          {/* Std Dev */}
-                          <div className="rounded bg-slate-950/60 p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted">
                               Std Dev (σ)
                             </div>
-                            <div
-                              className={cn(
-                                'mt-0.5 text-xs font-bold tabular-nums',
-                                isDeviant ? 'text-rose-400 font-semibold' : 'text-slate-200'
-                              )}
-                            >
+                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
                               {sec.std_dev.toFixed(1)}
                             </div>
                           </div>
 
-                          {/* Skewness */}
-                          <div className="rounded bg-slate-950/60 p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted">
                               Skewness
                             </div>
-                            <div
-                              className={cn(
-                                'mt-0.5 text-xs font-bold tabular-nums',
-                                isDeviant ? 'text-rose-400 font-semibold' : 'text-slate-200'
-                              )}
-                            >
+                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
                               {sec.skewness.toFixed(2)}
                             </div>
                           </div>
 
-                          {/* Z-score */}
-                          <div className="rounded bg-slate-950/60 p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted">
                               Z-Score
                             </div>
-                            <div
-                              className={cn(
-                                'mt-0.5 text-xs font-bold tabular-nums',
-                                isDeviant ? 'text-rose-400 font-semibold' : 'text-slate-200'
-                              )}
-                            >
+                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
                               {sec.z_score > 0 ? `+${sec.z_score.toFixed(2)}` : sec.z_score.toFixed(2)}
                             </div>
                           </div>
 
-                          {/* Leniency Index */}
-                          <div className="rounded bg-slate-950/60 p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted">
                               Leniency
                             </div>
-                            <div
-                              className={cn(
-                                'mt-0.5 text-xs font-bold tabular-nums',
-                                isDeviant ? 'text-rose-400 font-semibold' : 'text-amber-300'
-                              )}
-                            >
+                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
                               {sec.leniency_index.toFixed(2)}
                             </div>
                           </div>
@@ -673,21 +627,16 @@ export default function GradingParity() {
             </CardBody>
           </Card>
 
-          {/* ----------------------------------------------------------------
-           * TWO-COLUMN MIDDLE SECTION: DISCREPANCY INSIGHTS + NORMALIZATION PROPOSAL
-           * Stack vertically under 1024px
-           * ---------------------------------------------------------------- */}
+          {/* TWO-COLUMN MIDDLE SECTION */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* --------------------------------------------------------------
-             * B. DISCREPANCY INSIGHTS
-             * -------------------------------------------------------------- */}
+            {/* DISCREPANCY INSIGHTS */}
             <Card className="flex flex-col">
               <CardHeader
                 title="Discrepancy Insights"
                 subtitle="Algorithmic markers and statistical parity flags"
                 icon={AlertCircle}
                 action={
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-muted">
                     {report.insights?.length ?? 0} flags
                   </span>
                 }
@@ -702,20 +651,20 @@ export default function GradingParity() {
                     <div
                       key={idx}
                       className={cn(
-                        'rounded-lg border bg-slate-950/60 p-3.5 transition-colors',
+                        'rounded-[8px] border p-3.5 transition-colors',
                         isCritical
-                          ? 'border-slate-800 border-l-4 border-l-rose-500 bg-rose-500/[0.03]'
-                          : 'border-slate-800 border-l-4 border-l-amber-500/60 bg-slate-900/40'
+                          ? 'border-critical-border bg-critical-bg border-l-4 border-l-critical-text'
+                          : 'border-warning-border bg-warning-bg border-l-4 border-l-warning-text'
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-xs font-bold tracking-tight text-slate-100 sm:text-sm">
+                        <h4 className="text-xs font-bold tracking-tight text-heading sm:text-sm">
                           {insight.title}
                         </h4>
                         <SeverityPill severity={insight.severity} />
                       </div>
 
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+                      <p className="mt-1.5 text-xs leading-relaxed text-secondary">
                         {insight.detail}
                       </p>
                     </div>
@@ -724,9 +673,7 @@ export default function GradingParity() {
               </CardBody>
             </Card>
 
-            {/* --------------------------------------------------------------
-             * C. NORMALIZATION PROPOSAL
-             * -------------------------------------------------------------- */}
+            {/* NORMALIZATION PROPOSAL */}
             <Card className="flex flex-col">
               <CardHeader
                 title="Normalization Proposal"
@@ -745,15 +692,15 @@ export default function GradingParity() {
                   {/* Left Column: Benchmark Table */}
                   <div className="sm:col-span-7">
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-300">
+                      <span className="text-xs font-semibold text-primary">
                         Sample Mark Adjustment
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-[11px] text-muted">
                         {report.normalization?.section_name}
                       </span>
                     </div>
 
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/80">
+                    <div className="rounded-[8px] border border-border-default bg-surface">
                       <Table>
                         <THead>
                           <TR>
@@ -766,21 +713,21 @@ export default function GradingParity() {
                         <TBody>
                           {normalizationRows.map((row, idx) => (
                             <TR key={idx}>
-                              <TD className="text-xs font-medium text-slate-300">
+                              <TD className="text-xs font-medium text-primary">
                                 {row.benchmark}
                               </TD>
-                              <TD align="right" numeric className="text-xs text-slate-400">
+                              <TD align="right" numeric className="text-xs text-muted">
                                 {row.raw}
                               </TD>
-                              <TD align="right" numeric className="text-xs font-semibold text-slate-200">
+                              <TD align="right" numeric className="text-xs font-semibold text-primary">
                                 {row.suggested}
                               </TD>
-                              <TD align="right" numeric className="text-xs font-semibold text-emerald-400">
+                              <TD align="right" numeric className="text-xs font-semibold text-pass-text">
                                 <span className="inline-flex items-center gap-0.5">
                                   {row.isUp ? (
-                                    <ArrowUp className="h-3 w-3 text-emerald-400" />
+                                    <ArrowUp className="h-3 w-3 text-pass-text" />
                                   ) : (
-                                    <ArrowDown className="h-3 w-3 text-rose-400" />
+                                    <ArrowDown className="h-3 w-3 text-critical-text" />
                                   )}
                                   {row.delta}
                                 </span>
@@ -793,24 +740,22 @@ export default function GradingParity() {
                   </div>
 
                   {/* Right Column: Rationale & Advisory Action */}
-                  <div className="flex flex-col justify-between rounded-lg border border-slate-800/80 bg-slate-950/40 p-3 sm:col-span-5">
+                  <div className="flex flex-col justify-between rounded-[8px] border border-border-default bg-subtle p-3 sm:col-span-5">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-pass-text">
                         Statistical Rationale
                       </div>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                      <p className="mt-1.5 text-xs leading-relaxed text-secondary">
                         {report.normalization?.rationale}
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-800/80">
-                      {/* Advisory notice */}
-                      <div className="mb-3 flex items-start gap-1.5 text-[11px] text-slate-400">
-                        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+                    <div className="mt-4 pt-3 border-t border-border-default">
+                      <div className="mb-3 flex items-start gap-1.5 text-[11px] text-muted">
+                        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pass-text" />
                         <span>Advisory only — normalizations require official approval.</span>
                       </div>
 
-                      {/* Disabled button with tooltip */}
                       <div className="relative group w-full">
                         <Button
                           variant="primary"
@@ -821,8 +766,7 @@ export default function GradingParity() {
                           Apply Normalization
                         </Button>
 
-                        {/* Hover Tooltip */}
-                        <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 border border-slate-700 px-2 py-1 text-[11px] font-medium text-amber-300 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-10">
+                        <div className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-[4px] bg-surface border border-border-default px-2 py-1 text-[11px] font-medium text-primary opacity-0 shadow-elevation transition-opacity group-hover:opacity-100 z-10">
                           Requires HoD approval
                         </div>
                       </div>
@@ -833,15 +777,13 @@ export default function GradingParity() {
             </Card>
           </div>
 
-          {/* ----------------------------------------------------------------
-           * D. AI SUMMARY CARD
-           * ---------------------------------------------------------------- */}
+          {/* AI SUMMARY CARD */}
           <AiSummaryCard
             title="AI Parity Audit Synthesis"
             summary={report.ai_summary}
             meta={
-              <span className="inline-flex items-center gap-1 text-slate-400">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+              <span className="inline-flex items-center gap-1 text-muted">
+                <Sparkles className="h-3.5 w-3.5 text-green-500" />
                 Confidence: High · Seeded Calibration
               </span>
             }

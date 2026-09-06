@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -27,8 +27,8 @@ import {
   YAxis,
 } from 'recharts';
 
-import { BLOOM_LEVELS, ENDPOINTS, QUERY_KEYS } from '../api/contract.js';
-import { get, post } from '../api/client.js';
+import { BLOOM_LEVELS, ENDPOINTS } from '../api/contract.js';
+import { post } from '../api/client.js';
 import { cn } from '../lib/cn.js';
 import { ratioPct } from '../lib/format.js';
 import { annotateSyllabus, scoreBand } from '../lib/syllabus.js';
@@ -57,57 +57,52 @@ import {
  * Constants
  * ======================================================================= */
 
-/** The pair the demo tells its story with. */
-const DEMO_PAIR = { a: 'CSE 2101', b: 'CSE 2103' };
-
-/** Score band -> ring colour, text colour, and the verdict's opening clause. */
 const BANDS = {
   critical: {
-    hex: '#fb7185',
-    text: 'text-rose-400',
+    hex: 'var(--critical-border)',
+    text: 'text-critical-text',
     badge: 'critical',
     label: 'Severely misaligned',
     clause: 'The pair needs redesign before the next offering',
   },
   warning: {
-    hex: '#fbbf24',
-    text: 'text-amber-400',
+    hex: 'var(--warning-border)',
+    text: 'text-warning-text',
     badge: 'warning',
     label: 'Partially aligned',
     clause: 'Redundant teaching and prerequisite gaps both present',
   },
   pass: {
-    hex: '#34d399',
-    text: 'text-emerald-400',
+    hex: 'var(--pass-border)',
+    text: 'text-pass-text',
     badge: 'pass',
     label: 'Well aligned',
     clause: 'Only minor overlap between the two syllabi',
   },
   unknown: {
-    hex: '#475569',
-    text: 'text-slate-400',
+    hex: 'var(--text-muted)',
+    text: 'text-text-muted',
     badge: 'neutral',
     label: 'Not scored',
     clause: 'The audit returned no alignment score',
   },
 };
 
-/** Diff row treatment. `aligned` is the absence of a finding, not a verdict. */
 const DIFF_TONES = {
   redundant: {
-    base: 'border-amber-400/70 bg-amber-400/[0.07]',
-    active: 'border-amber-300 bg-amber-400/20',
-    label: 'text-amber-300',
+    base: 'border-warning-border bg-warning-fill',
+    active: 'border-warning-border bg-warning-fill ring-1 ring-warning-border',
+    label: 'text-warning-text',
   },
   missing: {
-    base: 'border-rose-400/70 bg-rose-400/[0.07]',
-    active: 'border-rose-300 bg-rose-400/20',
-    label: 'text-rose-300',
+    base: 'border-critical-border bg-critical-fill',
+    active: 'border-critical-border bg-critical-fill ring-1 ring-critical-border',
+    label: 'text-critical-text',
   },
   aligned: {
     base: 'border-transparent',
-    active: 'border-transparent bg-slate-800/40',
-    label: 'text-slate-500',
+    active: 'border-transparent bg-bg-hover',
+    label: 'text-text-muted',
   },
 };
 
@@ -121,11 +116,6 @@ const TABS = [
  * 1. Alignment score
  * ======================================================================= */
 
-/**
- * Alignment score as a stroked ring. Drawn by hand rather than with Recharts:
- * a single scalar does not need a chart runtime, and the SVG animates the
- * dash offset for free.
- */
 function ScoreRing({ score, band }) {
   const radius = 58;
   const stroke = 12;
@@ -145,7 +135,7 @@ function ScoreRing({ score, band }) {
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="#1e293b"
+        stroke="var(--bg-subtle)"
         strokeWidth={stroke}
       />
       <circle
@@ -160,15 +150,13 @@ function ScoreRing({ score, band }) {
         strokeDashoffset={circumference * (1 - clamped / 100)}
         className="transition-[stroke-dashoffset] duration-700 ease-out"
       />
-      {/* The ring starts at 12 o'clock because the <svg> is rotated -90°; this
-          counter-rotation puts the number back upright. */}
       <text
         x={size / 2}
         y={size / 2}
         transform={`rotate(90 ${size / 2} ${size / 2})`}
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-slate-100 text-[30px] font-semibold tabular-nums"
+        className="fill-text-heading text-[30px] font-semibold tabular-nums"
       >
         {clamped}
       </text>
@@ -200,17 +188,17 @@ function AlignmentHeader({ report, courseA, courseB }) {
           </p>
 
           <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-              <dt className="text-[11px] uppercase tracking-wide text-slate-500">Redundant</dt>
-              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-amber-400">{redundant}</dd>
+            <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+              <dt className="text-[11px] uppercase tracking-wide text-text-muted">Redundant</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-warning-text">{redundant}</dd>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-              <dt className="text-[11px] uppercase tracking-wide text-slate-500">Missing prereqs</dt>
-              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-rose-400">{missing}</dd>
+            <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+              <dt className="text-[11px] uppercase tracking-wide text-text-muted">Missing prereqs</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-critical-text">{missing}</dd>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-              <dt className="text-[11px] uppercase tracking-wide text-slate-500">Changes proposed</dt>
-              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-slate-200">
+            <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+              <dt className="text-[11px] uppercase tracking-wide text-text-muted">Changes proposed</dt>
+              <dd className="mt-0.5 text-xl font-semibold tabular-nums text-text-heading">
                 {report.actionable_changes?.length ?? 0}
               </dd>
             </div>
@@ -227,15 +215,15 @@ function AlignmentHeader({ report, courseA, courseB }) {
 
 function DiffLegend() {
   const items = [
-    { tone: 'bg-amber-400', label: 'Redundant overlap' },
-    { tone: 'bg-rose-400', label: 'Missing dependency' },
-    { tone: 'bg-slate-700', label: 'Aligned' },
+    { tone: 'bg-warning-border', label: 'Redundant overlap' },
+    { tone: 'bg-critical-border', label: 'Missing dependency' },
+    { tone: 'bg-border-default', label: 'Aligned' },
   ];
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
       {items.map((item) => (
-        <span key={item.label} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+        <span key={item.label} className="flex items-center gap-1.5 text-[11px] text-text-muted">
           <span className={cn('h-2.5 w-1 rounded-sm', item.tone)} aria-hidden="true" />
           {item.label}
         </span>
@@ -247,14 +235,14 @@ function DiffLegend() {
 function DiffRow({ row, flag, isActive, onActivate }) {
   if (row.kind === 'heading') {
     return (
-      <li className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500 first:pt-2">
+      <li className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-text-muted first:pt-2">
         {row.text}
       </li>
     );
   }
 
   if (row.kind === 'prose') {
-    return <li className="px-3 py-1 text-[11px] leading-relaxed text-slate-500">{row.text}</li>;
+    return <li className="px-3 py-1 text-[11px] leading-relaxed text-text-muted">{row.text}</li>;
   }
 
   const kind = flag?.kind ?? 'aligned';
@@ -270,13 +258,13 @@ function DiffRow({ row, flag, isActive, onActivate }) {
       className={cn(
         'focus-ring mx-2 my-0.5 rounded-r border-l-2 px-2.5 py-1.5 transition-colors',
         isActive ? tone.active : tone.base,
-        !flag && 'hover:bg-slate-800/40'
+        !flag && 'hover:bg-bg-hover'
       )}
     >
       <div className="flex items-start gap-2">
         {kind === 'missing' ? (
           <AlertTriangle
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-critical-text"
             strokeWidth={1.75}
             aria-hidden="true"
           />
@@ -287,7 +275,7 @@ function DiffRow({ row, flag, isActive, onActivate }) {
               {row.label}
             </span>
           ) : null}
-          <span className="text-[13px] leading-relaxed text-slate-300">{row.text}</span>
+          <span className="text-[13px] leading-relaxed text-text-primary">{row.text}</span>
           {flag ? (
             <p className={cn('mt-1 text-[11px] leading-snug', tone.label)}>{flag.detail}</p>
           ) : null}
@@ -303,15 +291,14 @@ function SyllabusPanel({ course, annotated, activeKey, onActivate, className, sc
   const missing = counts.filter((flag) => flag.kind === 'missing').length;
 
   return (
-    <div className={cn('min-w-0 rounded-lg border border-slate-800 bg-slate-950/40', className)}>
+    <div className={cn('min-w-0 rounded-lg border border-border-default bg-bg-surface', className)}>
       <div className={cn('overflow-y-auto', scrollClassName)}>
-        {/* Sticky inside the scroller, so the course code survives scrolling. */}
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-3 py-2 backdrop-blur">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border-default bg-bg-surface px-3 py-2 backdrop-blur">
           <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold tracking-tight text-slate-100">
+            <div className="truncate text-[13px] font-semibold tracking-tight text-text-heading">
               {course?.code ?? '—'}
             </div>
-            <div className="truncate text-[11px] text-slate-500">
+            <div className="truncate text-[11px] text-text-muted">
               {annotated.title ?? course?.title ?? 'Syllabus'}
             </div>
           </div>
@@ -355,25 +342,25 @@ function AccordionPanel({ course, annotated, activeKey, onActivate, defaultOpen 
   const counts = Object.values(annotated.flags).length;
 
   return (
-    <div className="rounded-lg border border-slate-800">
+    <div className="rounded-lg border border-border-default">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="focus-ring flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-slate-800/40"
+        className="focus-ring flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-bg-hover"
       >
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-semibold tracking-tight text-slate-100">
+          <span className="block truncate text-[13px] font-semibold tracking-tight text-text-heading">
             {course?.code ?? '—'}
           </span>
-          <span className="block truncate text-[11px] text-slate-500">
+          <span className="block truncate text-[11px] text-text-muted">
             {annotated.title ?? course?.title ?? 'Syllabus'}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {counts ? <Badge variant="warning">{counts} flagged</Badge> : null}
           <ChevronDown
-            className={cn('h-4 w-4 text-slate-500 transition-transform', open && 'rotate-180')}
+            className={cn('h-4 w-4 text-text-muted transition-transform', open && 'rotate-180')}
             strokeWidth={1.75}
             aria-hidden="true"
           />
@@ -386,7 +373,7 @@ function AccordionPanel({ course, annotated, activeKey, onActivate, defaultOpen 
           annotated={annotated}
           activeKey={activeKey}
           onActivate={onActivate}
-          className="rounded-none border-0 border-t border-slate-800"
+          className="rounded-none border-0 border-t border-border-default"
           scrollClassName="max-h-[26rem]"
         />
       ) : null}
@@ -464,10 +451,10 @@ function SimilarityBar({ value }) {
   const width = Math.max(0, Math.min(1, value ?? 0)) * 100;
   return (
     <div className="flex items-center justify-end gap-2">
-      <span className="w-24 overflow-hidden rounded-sm bg-slate-800" aria-hidden="true">
-        <span className="block h-1.5 rounded-sm bg-amber-400" style={{ width: `${width}%` }} />
+      <span className="w-24 overflow-hidden rounded-sm bg-bg-subtle border border-border-default" aria-hidden="true">
+        <span className="block h-1.5 rounded-sm bg-warning-border" style={{ width: `${width}%` }} />
       </span>
-      <span className="w-11 text-right tabular-nums text-slate-200">{ratioPct(value, 0)}</span>
+      <span className="w-11 text-right tabular-nums text-text-primary">{ratioPct(value, 0)}</span>
     </div>
   );
 }
@@ -501,9 +488,9 @@ function RedundantTopicsTable({ topics, courseA, courseB }) {
       <TBody>
         {sorted.map((topic) => (
           <TR key={`${topic.topic}-${topic.course_a_ref}`}>
-            <TD className="text-slate-200">{topic.topic}</TD>
-            <TD className="whitespace-nowrap text-slate-400">{topic.course_a_ref}</TD>
-            <TD className="whitespace-nowrap text-slate-400">{topic.course_b_ref}</TD>
+            <TD className="text-text-primary">{topic.topic}</TD>
+            <TD className="whitespace-nowrap text-text-secondary">{topic.course_a_ref}</TD>
+            <TD className="whitespace-nowrap text-text-secondary">{topic.course_b_ref}</TD>
             <TD align="right">
               <SimilarityBar value={topic.similarity} />
             </TD>
@@ -530,12 +517,12 @@ function MissingPrerequisiteCards({ prerequisites }) {
       {prerequisites.map((prerequisite) => (
         <article
           key={prerequisite.concept}
-          className="rounded-lg border border-rose-400/25 bg-rose-400/[0.04] p-3"
+          className="rounded-lg border border-critical-border bg-critical-fill p-3"
         >
           <header className="flex items-start justify-between gap-3">
-            <h3 className="flex min-w-0 items-start gap-2 text-[13px] font-semibold tracking-tight text-slate-100">
+            <h3 className="flex min-w-0 items-start gap-2 text-[13px] font-semibold tracking-tight text-text-heading">
               <AlertTriangle
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-critical-text"
                 strokeWidth={1.75}
                 aria-hidden="true"
               />
@@ -546,12 +533,12 @@ function MissingPrerequisiteCards({ prerequisites }) {
 
           <dl className="mt-3 space-y-1.5 text-[12px]">
             <div className="flex gap-2">
-              <dt className="w-32 shrink-0 text-slate-500">Assumed in</dt>
-              <dd className="min-w-0 text-slate-300">{prerequisite.assumed_in}</dd>
+              <dt className="w-32 shrink-0 text-text-muted">Assumed in</dt>
+              <dd className="min-w-0 text-text-secondary">{prerequisite.assumed_in}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="w-32 shrink-0 text-slate-500">Never introduced in</dt>
-              <dd className="min-w-0 text-slate-300">{prerequisite.never_introduced_in}</dd>
+              <dt className="w-32 shrink-0 text-text-muted">Never introduced in</dt>
+              <dd className="min-w-0 text-text-secondary">{prerequisite.never_introduced_in}</dd>
             </div>
           </dl>
         </article>
@@ -564,9 +551,9 @@ function BloomChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   const count = payload[0].value;
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-[12px] shadow-lg">
-      <div className="font-medium text-slate-100">{label}</div>
-      <div className="tabular-nums text-slate-400">
+    <div className="rounded-lg border border-border-default bg-bg-surface px-2.5 py-1.5 text-[12px] shadow-lg">
+      <div className="font-medium text-text-heading">{label}</div>
+      <div className="tabular-nums text-text-muted">
         {count} {count === 1 ? 'topic' : 'topics'}
         {count === 0 ? ' — no coverage' : ''}
       </div>
@@ -583,9 +570,9 @@ function BloomCoverage({ coverage, courseB }) {
 
   return (
     <div className="p-4">
-      <p className="mb-3 text-xs text-slate-500">
+      <p className="mb-3 text-xs text-text-muted">
         Topic counts per Bloom level for {courseB?.code ?? 'the target course'}. The backend reports{' '}
-        <code className="rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-300">
+        <code className="rounded bg-bg-subtle px-1 py-0.5 text-[11px] text-text-secondary border border-border-default">
           bloom_coverage
         </code>{' '}
         across the audited pair, so a level counted here may be taught in either syllabus.
@@ -594,46 +581,45 @@ function BloomCoverage({ coverage, courseB }) {
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -20 }}>
-            <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke="var(--border-default)" strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="level"
-              tick={{ fill: '#64748b', fontSize: 11 }}
-              axisLine={{ stroke: '#1e293b' }}
+              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+              axisLine={{ stroke: 'var(--border-default)' }}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: '#64748b', fontSize: 11 }}
+              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip cursor={{ fill: '#1e293b40' }} content={<BloomChartTooltip />} />
+            <Tooltip cursor={{ fill: 'var(--bg-subtle)' }} content={<BloomChartTooltip />} />
             <Bar dataKey="count" radius={[3, 3, 0, 0]} minPointSize={3} isAnimationActive={false}>
               {data.map((entry) => (
-                // Amber is reserved for the judgement: a level nothing assesses.
-                <Cell key={entry.level} fill={entry.count === 0 ? '#fbbf24' : '#64748b'} />
+                <Cell key={entry.level} fill={entry.count === 0 ? 'var(--warning-border)' : 'var(--action-primary)'} />
               ))}
-              <LabelList dataKey="count" position="top" fill="#94a3b8" fontSize={11} />
+              <LabelList dataKey="count" position="top" fill="var(--text-secondary)" fontSize={11} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {uncovered.length ? (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2">
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning-border bg-warning-fill px-3 py-2">
           <AlertTriangle
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning-text"
             strokeWidth={1.75}
             aria-hidden="true"
           />
-          <p className="text-[12px] leading-relaxed text-amber-200">
+          <p className="text-[12px] leading-relaxed text-warning-text">
             No coverage at {uncovered.map((entry) => entry.level).join(', ')}. Assessment at{' '}
             {uncovered.length === 1 ? 'this level' : 'these levels'} is absent from the pair — add at
             least one task there before the syllabus is signed off.
           </p>
         </div>
       ) : (
-        <p className="mt-3 text-[12px] text-slate-500">
+        <p className="mt-3 text-[12px] text-text-muted">
           All six Bloom levels carry at least one topic.
         </p>
       )}
@@ -654,7 +640,7 @@ function FindingsTabs({ report, courseA, courseB }) {
     <Card>
       <CardHeader icon={ListChecks} title="Findings" subtitle="Every anomaly the audit raised, by kind." />
 
-      <div className="flex gap-1 border-b border-slate-800 px-2" role="tablist" aria-label="Findings">
+      <div className="flex gap-1 border-b border-border-default px-2" role="tablist" aria-label="Findings">
         {TABS.map((item) => {
           const selected = tab === item.id;
           return (
@@ -667,13 +653,13 @@ function FindingsTabs({ report, courseA, courseB }) {
               className={cn(
                 'focus-ring -mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition-colors',
                 selected
-                  ? 'border-amber-400 text-amber-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-action-primary text-action-primary'
+                  : 'border-transparent text-text-muted hover:text-text-secondary'
               )}
             >
               {item.label}
               {counts[item.id] !== null ? (
-                <span className="tabular-nums text-[11px] text-slate-500">{counts[item.id]}</span>
+                <span className="tabular-nums text-[11px] text-text-muted">{counts[item.id]}</span>
               ) : null}
             </button>
           );
@@ -726,12 +712,12 @@ function ActionableChanges({ changes }) {
         title="Actionable changes"
         subtitle="Copy a line straight into the curriculum committee notes."
         action={
-          <span className="text-[11px] tabular-nums text-slate-500">
+          <span className="text-[11px] tabular-nums text-text-muted">
             {done.size}/{changes.length} done
           </span>
         }
       />
-      <ol className="divide-y divide-slate-800/70">
+      <ol className="divide-y divide-border-default">
         {changes.map((change, index) => {
           const checked = done.has(index);
           return (
@@ -744,8 +730,8 @@ function ActionableChanges({ changes }) {
                 className={cn(
                   'focus-ring mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] font-semibold tabular-nums transition-colors',
                   checked
-                    ? 'border-emerald-400/40 bg-emerald-400/15 text-emerald-300'
-                    : 'border-slate-700 bg-slate-950 text-slate-500 hover:border-slate-600'
+                    ? 'border-pass-border bg-pass-fill text-pass-text'
+                    : 'border-border-default bg-bg-surface text-text-muted hover:border-border-strong'
                 )}
               >
                 {checked ? <Check className="h-3 w-3" strokeWidth={2.5} /> : index + 1}
@@ -754,7 +740,7 @@ function ActionableChanges({ changes }) {
               <p
                 className={cn(
                   'min-w-0 flex-1 text-[13px] leading-relaxed',
-                  checked ? 'text-slate-500 line-through' : 'text-slate-300'
+                  checked ? 'text-text-muted line-through' : 'text-text-primary'
                 )}
               >
                 {change}
@@ -895,17 +881,10 @@ function NewCourseCrossAuditView() {
     });
   };
 
-  const bloomCounts = report?.bloom_coverage ?? { C1: 0, C2: 0, C3: 0, C4: 0, C5: 0, C6: 0 };
-  const chartData = BLOOM_LEVELS.map((level) => ({
-    level,
-    count: bloomCounts[level] ?? 0,
-  }));
-
   return (
     <div className="space-y-4">
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".md,.txt" className="hidden" />
 
-      {/* --- Top Proposal & Input Card --- */}
       <Card>
         <CardHeader
           icon={Layers}
@@ -915,7 +894,7 @@ function NewCourseCrossAuditView() {
         <CardBody className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400 mb-1">
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted mb-1">
                 Proposed Course Code
               </label>
               <input
@@ -923,11 +902,11 @@ function NewCourseCrossAuditView() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="e.g. CSE 3105"
-                className="w-full h-9 rounded-lg border border-slate-800 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                className="w-full h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-xs text-text-primary focus:border-border-focus focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400 mb-1">
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted mb-1">
                 Proposed Course Title
               </label>
               <input
@@ -935,20 +914,20 @@ function NewCourseCrossAuditView() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Machine Learning & Data Analytics"
-                className="w-full h-9 rounded-lg border border-slate-800 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                className="w-full h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-xs text-text-primary focus:border-border-focus focus:outline-none"
               />
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
                 Syllabus Markdown Schema (Week-by-Week Topics)
               </label>
               <a
                 href="/samples/curriculum_proposed_cse3105_machine_learning.md"
                 download="proposed_course_schema_template.md"
-                className="inline-flex items-center gap-1 font-mono text-[11px] text-cyan-400/90 underline hover:text-cyan-300"
+                className="inline-flex items-center gap-1 font-mono text-[11px] text-action-primary underline hover:opacity-80"
               >
                 <Download className="h-3 w-3" /> Download Schema Template
               </a>
@@ -957,11 +936,11 @@ function NewCourseCrossAuditView() {
               rows={8}
               value={syllabusMarkdown}
               onChange={(e) => setSyllabusMarkdown(e.target.value)}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-lg border border-border-default bg-bg-surface p-3 font-mono text-xs text-text-primary focus:border-border-focus focus:outline-none"
             />
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-default pt-3">
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="secondary"
@@ -977,7 +956,7 @@ function NewCourseCrossAuditView() {
                 icon={Layers}
                 loading={uploading}
                 onClick={loadSampleProposed}
-                className="border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
+                className="border-action-primary text-action-primary hover:bg-bg-subtle"
               >
                 Load Sample Proposed Course (CSE 3105 ML)
               </Button>
@@ -995,7 +974,7 @@ function NewCourseCrossAuditView() {
             </Button>
           </div>
 
-          {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
+          {loadError ? <p className="text-[11px] text-critical-text">{loadError}</p> : null}
         </CardBody>
       </Card>
 
@@ -1027,27 +1006,27 @@ function NewCourseCrossAuditView() {
         <>
           {/* Hero Card: Most Matched Course */}
           {report.most_matched_course ? (
-            <Card className="border-l-4 border-l-amber-400 bg-slate-900/90">
+            <Card className="border-l-4 border-l-warning-border bg-bg-surface">
               <CardBody className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-wide font-semibold text-slate-400">
+                    <span className="text-xs uppercase tracking-wide font-semibold text-text-muted">
                       Most Matched Existing Course in Catalog
                     </span>
                     <Badge variant="warning" dot>
                       {report.most_matched_course.overlap_percentage}% Overlap Match
                     </Badge>
                   </div>
-                  <span className="text-xs font-mono text-slate-500">
+                  <span className="text-xs font-mono text-text-muted">
                     {report.most_matched_course.redundant_topics_count} Overlapping Weeks
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-slate-100">
+                <h3 className="text-lg font-bold text-text-heading">
                   {report.most_matched_course.course_code} — {report.most_matched_course.course_title}
                 </h3>
-                <p className="text-xs leading-relaxed text-slate-300">
+                <p className="text-xs leading-relaxed text-text-secondary">
                   This course in the current curriculum carries the highest topic overlap with the proposed{' '}
-                  <span className="font-semibold text-cyan-300">{report.proposed_course?.code}</span> syllabus.
+                  <span className="font-semibold text-action-primary">{report.proposed_course?.code}</span> syllabus.
                 </p>
               </CardBody>
             </Card>
@@ -1066,20 +1045,20 @@ function NewCourseCrossAuditView() {
                   {report.novel_topics.map((item) => (
                     <div
                       key={item.week}
-                      className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-xs"
+                      className="rounded-lg border border-pass-border bg-pass-fill p-3 text-xs"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-emerald-400">{item.label}</span>
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wide font-mono">
+                        <span className="font-semibold text-pass-text">{item.label}</span>
+                        <span className="text-[10px] text-text-muted uppercase tracking-wide font-mono">
                           Unique Concept
                         </span>
                       </div>
-                      <p className="text-slate-300 leading-snug">{item.topic}</p>
+                      <p className="text-text-primary leading-snug">{item.topic}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">All topics in this proposal overlap with existing courses.</p>
+                <p className="text-xs text-text-muted">All topics in this proposal overlap with existing courses.</p>
               )}
             </CardBody>
           </Card>
@@ -1103,23 +1082,23 @@ function NewCourseCrossAuditView() {
               <TBody>
                 {(report.catalog_matches ?? []).map((item) => (
                   <TR key={item.course_code}>
-                    <TD className="font-medium text-slate-100">
+                    <TD className="font-medium text-text-heading">
                       {item.course_code} — {item.course_title}
                     </TD>
                     <TD align="right">
                       <span
                         className={cn(
                           'tabular-nums font-semibold',
-                          item.overlap_percentage > 40 ? 'text-amber-400' : 'text-slate-300'
+                          item.overlap_percentage > 40 ? 'text-warning-text' : 'text-text-secondary'
                         )}
                       >
                         {item.overlap_percentage}%
                       </span>
                     </TD>
-                    <TD align="right" className="tabular-nums text-slate-300">
+                    <TD align="right" className="tabular-nums text-text-secondary">
                       {item.redundant_topics_count}
                     </TD>
-                    <TD align="right" className="tabular-nums text-slate-400">
+                    <TD align="right" className="tabular-nums text-text-muted">
                       {item.missing_prerequisites_count}
                     </TD>
                   </TR>
@@ -1128,7 +1107,6 @@ function NewCourseCrossAuditView() {
             </Table>
           </Card>
 
-          {/* Groq Llama 3.3 Executive Report */}
           <AiSummaryCard
             summary={report.ai_summary}
             meta={`Proposal Audit: ${report.proposed_course?.code} ${report.proposed_course?.title}`}
@@ -1143,13 +1121,8 @@ function NewCourseCrossAuditView() {
  * Main Page Component with Mode Switcher
  * ======================================================================= */
 
-/**
- * OWNER: curriculum dev.
- *
- * Supports Course Pair Harmonization and Propose New Course Catalog Cross-Audit.
- */
 export default function CurriculumHarmonizerPage() {
-  const [mode, setMode] = useState('pair'); // 'pair' | 'propose'
+  const [mode, setMode] = useState('pair');
 
   const fileInputARef = useRef(null);
   const fileInputBRef = useRef(null);
@@ -1293,15 +1266,15 @@ export default function CurriculumHarmonizerPage() {
   return (
     <div className="space-y-4">
       {/* Mode Switcher Navigation Header */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-border-default pb-2">
         <button
           type="button"
           onClick={() => setMode('pair')}
           className={cn(
             'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
             mode === 'pair'
-              ? 'bg-amber-400/10 text-amber-300 border border-amber-400/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'bg-warning-fill text-warning-text border border-warning-border'
+              : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover'
           )}
         >
           <GitCompare className="h-3.5 w-3.5" /> Course Pair Harmonization
@@ -1312,8 +1285,8 @@ export default function CurriculumHarmonizerPage() {
           className={cn(
             'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
             mode === 'propose'
-              ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              ? 'bg-pass-fill text-pass-text border border-pass-border'
+              : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover'
           )}
         >
           <Layers className="h-3.5 w-3.5" /> Propose New Course (Catalog Cross-Audit)
@@ -1324,7 +1297,6 @@ export default function CurriculumHarmonizerPage() {
         <NewCourseCrossAuditView />
       ) : (
         <>
-          {/* Hidden file inputs */}
           <input type="file" ref={fileInputARef} onChange={handleFileUploadA} accept=".md,.txt" className="hidden" />
           <input type="file" ref={fileInputBRef} onChange={handleFileUploadB} accept=".md,.txt" className="hidden" />
 
@@ -1341,7 +1313,7 @@ export default function CurriculumHarmonizerPage() {
                   icon={GitCompare}
                   loading={uploading}
                   onClick={loadSamplePair}
-                  className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                  className="border-warning-border text-warning-text hover:bg-warning-fill"
                 >
                   Load Overlapping Curriculums Sample
                 </Button>
@@ -1349,9 +1321,8 @@ export default function CurriculumHarmonizerPage() {
             />
             <CardBody className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-                {/* Curriculum A Upload Button */}
                 <div className="lg:col-span-2 space-y-1">
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
                     Prerequisite Curriculum (A)
                   </label>
                   <Button
@@ -1365,7 +1336,6 @@ export default function CurriculumHarmonizerPage() {
                   </Button>
                 </div>
 
-                {/* Swap Button */}
                 <div className="flex items-center justify-center pb-0.5">
                   <Button
                     variant="ghost"
@@ -1379,9 +1349,8 @@ export default function CurriculumHarmonizerPage() {
                   />
                 </div>
 
-                {/* Curriculum B Upload Button */}
                 <div className="lg:col-span-2 space-y-1">
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
                     Target Curriculum (B)
                   </label>
                   <Button
@@ -1396,61 +1365,60 @@ export default function CurriculumHarmonizerPage() {
                 </div>
               </div>
 
-              {/* Action buttons & templates bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3">
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
-                  <span className="font-medium text-slate-300">Templates:</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-default pt-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border-default bg-bg-subtle px-3 py-1.5 text-[11px] text-text-muted">
+                  <span className="font-medium text-text-secondary">Templates:</span>
                   <a
                     href="/samples/curriculum_cse2101_data_structures.md"
                     download="curriculum_cse2101_data_structures.md"
-                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                    className="inline-flex items-center gap-1 font-mono text-action-primary underline hover:opacity-80"
                   >
                     <Download className="h-3 w-3" /> Data Structures (.md)
                   </a>
-                  <span className="text-slate-600">·</span>
+                  <span className="text-text-muted">·</span>
                   <a
                     href="/samples/curriculum_cse2103_algorithms.md"
                     download="curriculum_cse2103_algorithms.md"
-                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                    className="inline-flex items-center gap-1 font-mono text-action-primary underline hover:opacity-80"
                   >
                     <Download className="h-3 w-3" /> Algorithms (.md)
                   </a>
-                  <span className="text-slate-600">·</span>
+                  <span className="text-text-muted">·</span>
                   <a
                     href="/samples/curriculum_cse3101_database_systems.md"
                     download="curriculum_cse3101_database_systems.md"
-                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                    className="inline-flex items-center gap-1 font-mono text-action-primary underline hover:opacity-80"
                   >
                     <Download className="h-3 w-3" /> DBMS (.md)
                   </a>
-                  <span className="text-slate-600">·</span>
+                  <span className="text-text-muted">·</span>
                   <a
                     href="/samples/curriculum_cse3103_operating_systems.md"
                     download="curriculum_cse3103_operating_systems.md"
-                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                    className="inline-flex items-center gap-1 font-mono text-action-primary underline hover:opacity-80"
                   >
                     <Download className="h-3 w-3" /> OS (.md)
                   </a>
-                  <span className="text-slate-600">·</span>
+                  <span className="text-text-muted">·</span>
                   <a
                     href="/samples/curriculum_cse4101_computer_networks.md"
                     download="curriculum_cse4101_computer_networks.md"
-                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                    className="inline-flex items-center gap-1 font-mono text-action-primary underline hover:opacity-80"
                   >
                     <Download className="h-3 w-3" /> Networks (.md)
                   </a>
-                  <span className="text-slate-600">·</span>
+                  <span className="text-text-muted">·</span>
                   <a
                     href="/samples/curriculum_cse4103_artificial_intelligence.md"
                     download="curriculum_cse4103_artificial_intelligence.md"
-                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                    className="inline-flex items-center gap-1 font-mono text-action-primary underline hover:opacity-80"
                   >
                     <Download className="h-3 w-3" /> AI (.md)
                   </a>
                   {activeCohortTitle ? (
                     <>
-                      <span className="text-slate-600">·</span>
-                      <span className="font-semibold text-amber-400">{activeCohortTitle}</span>
+                      <span className="text-text-muted">·</span>
+                      <span className="font-semibold text-warning-text">{activeCohortTitle}</span>
                     </>
                   ) : null}
                 </div>
@@ -1477,15 +1445,15 @@ export default function CurriculumHarmonizerPage() {
               </div>
 
               {isSameFile ? (
-                <div className="flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                <div className="flex items-center gap-2 rounded-lg border border-critical-border bg-critical-fill px-3 py-2 text-xs text-critical-text">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-critical-text" />
                   <span>
                     Validation Error: The same curriculum file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different course curriculum files.
                   </span>
                 </div>
               ) : null}
 
-              {loadError ? <p className="text-[11px] text-rose-300 font-medium">{loadError}</p> : null}
+              {loadError ? <p className="text-[11px] text-critical-text font-medium">{loadError}</p> : null}
             </CardBody>
           </Card>
 
@@ -1530,9 +1498,8 @@ export default function CurriculumHarmonizerPage() {
             </>
           )}
 
-          {/* Refetching an already-visible pair keeps the results on screen. */}
           {report && isFetching ? (
-            <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <p className="flex items-center gap-1.5 text-[11px] text-text-muted">
               <RotateCw className="h-3 w-3 animate-spin" strokeWidth={2} aria-hidden="true" />
               Re-running the audit…
             </p>
@@ -1542,4 +1509,3 @@ export default function CurriculumHarmonizerPage() {
     </div>
   );
 }
-

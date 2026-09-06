@@ -1,16 +1,8 @@
 import { cn } from '../../lib/cn.js';
 
 /**
- * Dense data table. Wrap in a `Card` for a bordered surface; the wrapper here
- * only owns horizontal overflow so wide tables never widen the page.
- *
- * Compose it:
- *   <Table>
- *     <THead><TR><TH>Section</TH><TH align="right">Mean</TH></TR></THead>
- *     <TBody>
- *       <TR><TD>Section A</TD><TD align="right" numeric>24.2</TD></TR>
- *     </TBody>
- *   </Table>
+ * Dense data table. Wrap in a `Card` for a bordered surface.
+ * Row 44px, Header 40px, cell padding 12px horizontal.
  */
 export function Table({ className, children, ...rest }) {
   return (
@@ -24,21 +16,34 @@ export function Table({ className, children, ...rest }) {
 
 export function THead({ className, children }) {
   return (
-    <thead className={cn('border-b border-slate-800 bg-slate-900/60', className)}>{children}</thead>
+    <thead className={cn('sticky top-0 z-10 border-b border-border-default bg-subtle', className)}>
+      {children}
+    </thead>
   );
 }
 
 export function TBody({ className, children }) {
-  return <tbody className={cn('divide-y divide-slate-800/70', className)}>{children}</tbody>;
+  return <tbody className={cn('divide-y divide-border-default', className)}>{children}</tbody>;
 }
 
-/** @param {{hover?: boolean, selected?: boolean}} props */
-export function TR({ hover = true, selected = false, className, children, ...rest }) {
+/**
+ * @param {{hover?: boolean, selected?: boolean, severity?: 'pass'|'warning'|'critical'|'info'}} props
+ */
+export function TR({ hover = true, selected = false, severity, className, children, ...rest }) {
+  const SEVERITY_BORDER = {
+    pass: 'border-l-[3px] border-l-pass-border',
+    warning: 'border-l-[3px] border-l-warning-border',
+    critical: 'border-l-[3px] border-l-critical-border',
+    info: 'border-l-[3px] border-l-info-border',
+  };
+
   return (
     <tr
       className={cn(
-        hover && 'transition-colors hover:bg-slate-800/40',
-        selected && 'bg-amber-400/5',
+        'h-[44px] transition-colors border-b border-border-default',
+        hover && 'hover:bg-hover',
+        selected && 'bg-subtle',
+        severity && SEVERITY_BORDER[severity],
         className
       )}
       {...rest}
@@ -56,7 +61,7 @@ export function TH({ align = 'left', className, children, ...rest }) {
     <th
       scope="col"
       className={cn(
-        'px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-500',
+        'h-10 px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-muted',
         ALIGN[align],
         className
       )}
@@ -72,8 +77,8 @@ export function TD({ align = 'left', numeric = false, className, children, ...re
   return (
     <td
       className={cn(
-        'px-3 py-2 align-middle text-slate-300',
-        numeric && 'tabular-nums text-slate-200',
+        'px-3 py-2.5 align-middle text-secondary',
+        numeric && 'tabular-nums text-primary font-medium',
         ALIGN[align],
         className
       )}

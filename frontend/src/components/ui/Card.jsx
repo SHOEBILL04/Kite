@@ -9,8 +9,8 @@ export function Card({ as: Tag = 'section', className, padded = false, children,
   return (
     <Tag
       className={cn(
-        'rounded-lg border border-slate-800 bg-slate-900',
-        padded && 'p-4',
+        'rounded-[8px] border border-border-default bg-surface shadow-elevation',
+        padded && 'p-5',
         className
       )}
       {...rest}
@@ -22,6 +22,7 @@ export function Card({ as: Tag = 'section', className, padded = false, children,
 
 /**
  * Card title row. `action` sits flush right — put filters or buttons there.
+ * No bottom divider line per design specs.
  *
  * @param {{title: React.ReactNode, subtitle?: React.ReactNode, icon?: React.ElementType,
  *          action?: React.ReactNode, className?: string}} props
@@ -30,15 +31,15 @@ export function CardHeader({ title, subtitle, icon: Icon, action, className }) {
   return (
     <div
       className={cn(
-        'flex items-start justify-between gap-3 border-b border-slate-800 px-4 py-3',
+        'flex items-start justify-between gap-3 px-5 pt-5 pb-3',
         className
       )}
     >
       <div className="flex min-w-0 items-start gap-2.5">
-        {Icon ? <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.75} /> : null}
+        {Icon ? <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted" strokeWidth={1.75} /> : null}
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold tracking-tight text-slate-100">{title}</h2>
-          {subtitle ? <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p> : null}
+          <h2 className="truncate text-base font-semibold tracking-tight text-heading">{title}</h2>
+          {subtitle ? <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p> : null}
         </div>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -46,9 +47,9 @@ export function CardHeader({ title, subtitle, icon: Icon, action, className }) {
   );
 }
 
-/** Body wrapper with the standard dense padding. */
+/** Body wrapper with standard padding. */
 export function CardBody({ className, children }) {
-  return <div className={cn('p-4', className)}>{children}</div>;
+  return <div className={cn('px-5 pb-5 pt-2', className)}>{children}</div>;
 }
 
 export default Card;
