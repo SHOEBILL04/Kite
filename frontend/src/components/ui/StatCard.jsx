@@ -2,15 +2,14 @@ import { cn } from '../../lib/cn.js';
 import { Skeleton } from './Skeleton.jsx';
 
 const TONES = {
-  neutral: 'text-slate-100',
-  pass: 'text-emerald-400',
-  warning: 'text-amber-400',
-  critical: 'text-rose-400',
+  neutral: 'text-heading',
+  pass: 'text-pass-text',
+  warning: 'text-warning-text',
+  critical: 'text-critical-text',
 };
 
 /**
- * A single headline figure. The number is the loudest thing in the card —
- * label above it, context beneath it, nothing else.
+ * A single headline figure. Min-height 104px, 20px padding.
  *
  * @param {{label: string, value: React.ReactNode, hint?: React.ReactNode,
  *          icon?: React.ElementType, tone?: 'neutral'|'pass'|'warning'|'critical',
@@ -35,35 +34,35 @@ export function StatCard({
     <Tag
       onClick={onClick}
       className={cn(
-        'rounded-lg border border-slate-800 bg-slate-900 p-4 text-left',
-        interactive && 'focus-ring transition-colors hover:border-slate-700',
+        'min-h-[104px] rounded-[8px] border border-border-default bg-surface p-5 text-left transition-all shadow-elevation',
+        interactive && 'focus-ring cursor-pointer hover:border-border-strong hover:-translate-y-[1px]',
         className
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">
           {label}
         </span>
-        {Icon ? <Icon className="h-4 w-4 text-slate-600" strokeWidth={1.75} /> : null}
+        {Icon ? <Icon className="h-5 w-5 text-green-500 opacity-60" strokeWidth={1.75} /> : null}
       </div>
 
       {loading ? (
-        <Skeleton className="mt-2 h-8 w-20" />
+        <Skeleton className="mt-2 h-8 w-24" />
       ) : (
-        <div className="mt-1.5 flex items-baseline gap-2">
+        <div className="mt-2 flex items-baseline gap-2">
           <span
             className={cn(
-              'text-3xl font-semibold tabular-nums leading-none tracking-tight',
+              'text-[28px] font-semibold tabular-nums leading-none tracking-tight',
               TONES[tone] ?? TONES.neutral
             )}
           >
             {value}
           </span>
-          {delta ? <span className="text-xs tabular-nums text-slate-500">{delta}</span> : null}
+          {delta ? <span className="text-xs tabular-nums text-muted">{delta}</span> : null}
         </div>
       )}
 
-      {hint ? <p className="mt-2 text-xs leading-snug text-slate-500">{hint}</p> : null}
+      {hint ? <p className="mt-2 text-xs leading-snug text-muted">{hint}</p> : null}
     </Tag>
   );
 }

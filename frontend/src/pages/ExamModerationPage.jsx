@@ -14,10 +14,8 @@ import {
   ListTree,
   Play,
   Plus,
-  RefreshCw,
   Scale,
   Sigma,
-  Sparkles,
   Tag,
   Trash2,
   TrendingUp,
@@ -46,10 +44,8 @@ import {
  * Constants
  * ======================================================================= */
 
-/** Outcome labels offered in the editor. CSE 2101 declares CLO1..CLO4. */
 const DEFAULT_CLOS = ['CLO1', 'CLO2', 'CLO3', 'CLO4'];
 
-/** Bloom level -> the verb family a moderator recognises it by. */
 const BLOOM_LABELS = {
   C1: 'C1 Remember',
   C2: 'C2 Understand',
@@ -60,44 +56,42 @@ const BLOOM_LABELS = {
 };
 
 /**
- * Cool -> warm ramp across the six Bloom levels, kept inside the app's slate
- * and amber vocabulary: recall reads cold, creation reads hot.
+ * Single-hue ramp for Bloom levels C1 -> C6 using semantic theme tokens.
  */
 const BLOOM_RAMP = {
-  C1: '#475569',
-  C2: '#64748b',
-  C3: '#94a3b8',
-  C4: '#fcd34d',
-  C5: '#fbbf24',
-  C6: '#f59e0b',
+  C1: 'var(--green-50)',
+  C2: 'var(--green-200)',
+  C3: 'var(--green-500)',
+  C4: 'var(--teal-500)',
+  C5: 'var(--amber-500)',
+  C6: 'var(--green-900)',
 };
 
-/** Contract `Verdict` -> the presentation the whole page agrees on. */
+/** Contract Verdict -> presentation mapping */
 const VERDICT_TONES = {
   pass: {
     badge: 'pass',
     label: 'Pass',
-    border: 'border-l-emerald-400',
-    text: 'text-emerald-400',
-    ring: '#34d399',
+    border: 'border-l-pass-border',
+    text: 'text-pass-text',
+    ring: 'var(--pass-border)',
   },
   warning: {
     badge: 'warning',
     label: 'Warning',
-    border: 'border-l-amber-400',
-    text: 'text-amber-400',
-    ring: '#fbbf24',
+    border: 'border-l-warning-border',
+    text: 'text-warning-text',
+    ring: 'var(--warning-border)',
   },
   critical: {
     badge: 'critical',
     label: 'Critical',
-    border: 'border-l-rose-400',
-    text: 'text-rose-400',
-    ring: '#fb7185',
+    border: 'border-l-critical-border',
+    text: 'text-critical-text',
+    ring: 'var(--critical-border)',
   },
 };
 
-/** `QuestionFlag.type` -> icon. Unknown slugs fall back to a warning triangle. */
 const FLAG_ICONS = {
   verb_mismatch: Tag,
   clo_inflation: TrendingUp,
@@ -106,7 +100,6 @@ const FLAG_ICONS = {
   time_budget: Clock,
 };
 
-/** Status line shown while the audit runs, one stage per tick. */
 const AUDIT_STAGES = [
   'Parsing question stems…',
   'Classifying Bloom verbs against the tagged levels…',
@@ -128,24 +121,12 @@ const EMPTY_QUESTION = {
  * ======================================================================= */
 
 let rowSequence = 0;
-/** Rows need a key that survives editing `q_number`, which is user-controlled. */
 const withKey = (question) => ({ ...question, _key: `row-${(rowSequence += 1)}` });
-
-/** Editor row -> the contract's `DraftQuestion` shape (drops the local key). */
 const toDraftQuestion = ({ _key, ...question }) => question;
 
 const sumMarks = (questions) =>
   questions.reduce((total, question) => total + (Number(question.marks) || 0), 0);
 
-/**
- * Validate a pasted JSON payload as an array of draft questions.
- *
- * The editor accepts partial rows — a half-written question is not an error,
- * only a shape that cannot be a question list at all is.
- *
- * @param {string} source
- * @returns {{ok: true, questions: Array} | {ok: false, message: string}}
- */
 function parseQuestionsJson(source) {
   let parsed;
   try {
@@ -181,13 +162,6 @@ function parseQuestionsJson(source) {
   };
 }
 
-/**
- * Parse CSV question list into structured questions.
- * Handles commas, quotes, and header rows cleanly.
- *
- * @param {string} source
- * @returns {{ok: true, questions: Array} | {ok: false, message: string}}
- */
 function parseCsvQuestions(source) {
   const lines = source.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length === 0) {
@@ -257,8 +231,8 @@ function parseCsvQuestions(source) {
  * ======================================================================= */
 
 const FIELD_CLASS =
-  'focus-ring w-full rounded-lg border border-slate-800 bg-slate-950 px-2 py-1.5 text-[13px] text-slate-200 ' +
-  'placeholder:text-slate-600 transition-colors hover:border-slate-700';
+  'focus-ring w-full rounded-lg border border-border-default bg-bg-surface px-2.5 py-1.5 text-[13px] text-text-primary ' +
+  'placeholder:text-text-muted transition-colors hover:border-border-strong';
 
 function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRemove }) {
   const tone = verdict ? VERDICT_TONES[verdict] : null;
@@ -266,15 +240,13 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
   return (
     <li
       className={cn(
-        'rounded-lg border border-l-2 border-slate-800 bg-slate-900 p-3 transition-colors',
-        // Once the audit has run, the editor carries the scorecard's judgement
-        // back to the line that caused it.
-        tone ? tone.border : 'border-l-slate-800'
+        'rounded-lg border border-l-2 border-border-default bg-bg-surface p-3 transition-colors',
+        tone ? tone.border : 'border-l-border-default'
       )}
     >
       <div className="flex flex-wrap items-end gap-2">
         <label className="w-20 shrink-0">
-          <span className="mb-1 block text-[10px] uppercase tracking-wide text-slate-500">No.</span>
+          <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">No.</span>
           <input
             value={question.q_number}
             onChange={(event) => onChange(index, { q_number: event.target.value })}
@@ -284,7 +256,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
         </label>
 
         <label className="w-20 shrink-0">
-          <span className="mb-1 block text-[10px] uppercase tracking-wide text-slate-500">Marks</span>
+          <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">Marks</span>
           <input
             type="number"
             min="0"
@@ -296,7 +268,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
         </label>
 
         <label className="min-w-[7.5rem] flex-1">
-          <span className="mb-1 block text-[10px] uppercase tracking-wide text-slate-500">Bloom</span>
+          <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">Bloom</span>
           <select
             value={question.assigned_bloom_level}
             onChange={(event) => onChange(index, { assigned_bloom_level: event.target.value })}
@@ -311,7 +283,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
         </label>
 
         <label className="w-24 shrink-0">
-          <span className="mb-1 block text-[10px] uppercase tracking-wide text-slate-500">CLO</span>
+          <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">CLO</span>
           <select
             value={question.assigned_clo}
             onChange={(event) => onChange(index, { assigned_clo: event.target.value })}
@@ -368,9 +340,9 @@ function JsonEditor({ value, onChange, validity }) {
           </Badge>
         )}
         {!validity.ok ? (
-          <span className="min-w-0 truncate text-[11px] text-rose-300">{validity.message}</span>
+          <span className="min-w-0 truncate text-[11px] text-critical-text">{validity.message}</span>
         ) : (
-          <span className="text-[11px] text-slate-500">Parsed into the editor as you type.</span>
+          <span className="text-[11px] text-text-muted">Parsed into the editor as you type.</span>
         )}
       </div>
 
@@ -381,15 +353,14 @@ function JsonEditor({ value, onChange, validity }) {
         rows={22}
         aria-label="Questions as JSON"
         className={cn(
-          'focus-ring w-full resize-y rounded-lg border bg-slate-950 p-3 font-mono text-[12px] leading-relaxed text-slate-300',
-          validity.ok ? 'border-slate-800' : 'border-rose-400/40'
+          'focus-ring w-full resize-y rounded-lg border bg-bg-surface p-3 font-mono text-[12px] leading-relaxed text-text-primary',
+          validity.ok ? 'border-border-default' : 'border-critical-border'
         )}
       />
     </div>
   );
 }
 
-/** Running total against the declared total — the check that needs no AI call. */
 function MarkTotalFooter({ questions, declaredTotal }) {
   const total = sumMarks(questions);
   const known = typeof declaredTotal === 'number';
@@ -401,32 +372,32 @@ function MarkTotalFooter({ questions, declaredTotal }) {
       className={cn(
         'flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2.5 transition-colors',
         !known
-          ? 'border-slate-800 bg-slate-950'
+          ? 'border-border-default bg-bg-subtle'
           : matches
-            ? 'border-emerald-400/30 bg-emerald-400/[0.06]'
-            : 'border-rose-400/40 bg-rose-400/[0.08]'
+            ? 'border-pass-border bg-pass-fill'
+            : 'border-critical-border bg-critical-fill'
       )}
     >
       <div className="flex items-center gap-2.5">
         {known ? (
           matches ? (
-            <Check className="h-4 w-4 text-emerald-400" strokeWidth={2.5} aria-hidden="true" />
+            <Check className="h-4 w-4 text-pass-text" strokeWidth={2.5} aria-hidden="true" />
           ) : (
-            <X className="h-4 w-4 text-rose-400" strokeWidth={2.5} aria-hidden="true" />
+            <X className="h-4 w-4 text-critical-text" strokeWidth={2.5} aria-hidden="true" />
           )
         ) : (
-          <Sigma className="h-4 w-4 text-slate-500" strokeWidth={2} aria-hidden="true" />
+          <Sigma className="h-4 w-4 text-text-muted" strokeWidth={2} aria-hidden="true" />
         )}
         <div className="leading-tight">
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">Marks on the paper</div>
+          <div className="text-[11px] uppercase tracking-wide text-text-muted">Marks on the paper</div>
           <div
             className={cn(
               'text-lg font-semibold tabular-nums',
-              !known ? 'text-slate-200' : matches ? 'text-emerald-400' : 'text-rose-400'
+              !known ? 'text-text-primary' : matches ? 'text-pass-text' : 'text-critical-text'
             )}
           >
             {num(total, 1)}
-            <span className="text-sm font-normal text-slate-500">
+            <span className="text-sm font-normal text-text-muted">
               {' '}
               / {known ? num(declaredTotal, 1) : '—'} declared
             </span>
@@ -435,16 +406,16 @@ function MarkTotalFooter({ questions, declaredTotal }) {
       </div>
 
       <div className="text-right">
-        <div className="text-[11px] uppercase tracking-wide text-slate-500">
+        <div className="text-[11px] uppercase tracking-wide text-text-muted">
           {questions.length} {questions.length === 1 ? 'question' : 'questions'}
         </div>
         {known && !matches ? (
-          <div className="text-[12px] font-medium tabular-nums text-rose-300">
+          <div className="text-[12px] font-medium tabular-nums text-critical-text">
             {delta > 0 ? '+' : ''}
             {num(delta, 1)} against the declared total
           </div>
         ) : (
-          <div className="text-[12px] text-slate-500">
+          <div className="text-[12px] text-text-muted">
             {known ? 'Mark sum reconciles' : 'Load an exam to compare'}
           </div>
         )}
@@ -457,11 +428,6 @@ function MarkTotalFooter({ questions, declaredTotal }) {
  * Right pane — scorecard
  * ======================================================================= */
 
-/**
- * The contract has no single top-level verdict, so the header derives one:
- * a broken mark sum or any critical question is critical; any warning
- * anywhere is a warning; otherwise the paper passes.
- */
 function overallVerdict(report) {
   const verdicts = (report.questions ?? []).map((question) => question.verdict);
   if (!report.mark_sum_valid || verdicts.includes('critical')) return 'critical';
@@ -491,9 +457,9 @@ function ScorecardHeader({ report, exam }) {
         }
       />
       <CardBody className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">Questions</div>
-          <div className="mt-0.5 text-xl font-semibold tabular-nums text-slate-100">
+        <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+          <div className="text-[11px] uppercase tracking-wide text-text-muted">Questions</div>
+          <div className="mt-0.5 text-xl font-semibold tabular-nums text-text-heading">
             {report.questions?.length ?? 0}
           </div>
         </div>
@@ -501,24 +467,24 @@ function ScorecardHeader({ report, exam }) {
         <div
           className={cn(
             'rounded-lg border px-3 py-2 sm:col-span-2',
-            sumValid ? 'border-emerald-400/30 bg-emerald-400/[0.06]' : 'border-rose-400/40 bg-rose-400/[0.08]'
+            sumValid ? 'border-pass-border bg-pass-fill' : 'border-critical-border bg-critical-fill'
           )}
         >
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">Mark sum</div>
+          <div className="text-[11px] uppercase tracking-wide text-text-muted">Mark sum</div>
           <div className="mt-0.5 flex items-center gap-2">
             {sumValid ? (
-              <Check className="h-4 w-4 shrink-0 text-emerald-400" strokeWidth={2.5} aria-hidden="true" />
+              <Check className="h-4 w-4 shrink-0 text-pass-text" strokeWidth={2.5} aria-hidden="true" />
             ) : (
-              <X className="h-4 w-4 shrink-0 text-rose-400" strokeWidth={2.5} aria-hidden="true" />
+              <X className="h-4 w-4 shrink-0 text-critical-text" strokeWidth={2.5} aria-hidden="true" />
             )}
             <span
               className={cn(
                 'text-xl font-semibold tabular-nums',
-                sumValid ? 'text-emerald-400' : 'text-rose-400'
+                sumValid ? 'text-pass-text' : 'text-critical-text'
               )}
             >
               {num(report.calculated_total, 1)}
-              <span className="text-sm font-normal text-slate-500">
+              <span className="text-sm font-normal text-text-muted">
                 {' '}
                 calculated / {num(report.declared_total, 1)} declared
               </span>
@@ -530,7 +496,6 @@ function ScorecardHeader({ report, exam }) {
   );
 }
 
-/** Share of questions whose detected Bloom level matches the tagged one. */
 function BloomAlignmentGauge({ questions }) {
   const total = questions?.length ?? 0;
   const matched = (questions ?? []).filter(
@@ -561,7 +526,7 @@ function BloomAlignmentGauge({ questions }) {
             >
               <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
               <RadialBar
-                background={{ fill: '#1e293b' }}
+                background={{ fill: 'var(--bg-subtle)' }}
                 dataKey="value"
                 cornerRadius={7}
                 isAnimationActive={false}
@@ -569,18 +534,16 @@ function BloomAlignmentGauge({ questions }) {
             </RadialBarChart>
           </ResponsiveContainer>
 
-          {/* Centred over the ring rather than drawn into it: Recharts labels
-              cannot carry the app's type scale. */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className={cn('text-3xl font-semibold tabular-nums leading-none', tone.text)}>
               {pct(percentage, 0)}
             </span>
-            <span className="mt-1 text-[11px] text-slate-500">aligned</span>
+            <span className="mt-1 text-[11px] text-text-muted">aligned</span>
           </div>
         </div>
 
-        <p className="mt-3 text-center text-[12px] text-slate-400">
-          <span className="tabular-nums text-slate-200">
+        <p className="mt-3 text-center text-[12px] text-text-secondary">
+          <span className="tabular-nums text-text-heading font-medium">
             {matched} of {total}
           </span>{' '}
           questions carry the Bloom level their verbs actually demand.
@@ -590,7 +553,6 @@ function BloomAlignmentGauge({ questions }) {
   );
 }
 
-/** Marks per Bloom level as one stacked bar — the paper's cognitive weight. */
 function CognitiveDemandHeatmap({ questions, balance }) {
   const segments = useMemo(() => {
     const marksByLevel = Object.fromEntries(BLOOM_LEVELS.map((level) => [level, 0]));
@@ -623,14 +585,14 @@ function CognitiveDemandHeatmap({ questions, balance }) {
         }
       />
       <CardBody>
-        <div className="flex h-7 w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
+        <div className="flex h-7 w-full overflow-hidden rounded-lg border border-border-default bg-bg-subtle">
           {segments.map((segment) =>
             segment.share > 0 ? (
               <div
                 key={segment.level}
                 title={`${segment.level} — ${num(segment.marks, 0)} marks (${pct(segment.share, 1)})`}
                 style={{ width: `${segment.share}%`, backgroundColor: BLOOM_RAMP[segment.level] }}
-                className="flex items-center justify-center text-[10px] font-semibold text-slate-950"
+                className="flex items-center justify-center text-[10px] font-semibold text-text-heading"
               >
                 {segment.share >= 8 ? segment.level : null}
               </div>
@@ -640,31 +602,31 @@ function CognitiveDemandHeatmap({ questions, balance }) {
 
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {segments.map((segment) => (
-            <span key={segment.level} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span key={segment.level} className="flex items-center gap-1.5 text-[11px] text-text-muted">
               <span
                 className="h-2 w-2 rounded-sm"
                 style={{ backgroundColor: BLOOM_RAMP[segment.level] }}
                 aria-hidden="true"
               />
               {segment.level}
-              <span className="tabular-nums text-slate-400">{num(segment.marks, 0)}</span>
+              <span className="tabular-nums text-text-secondary">{num(segment.marks, 0)}</span>
             </span>
           ))}
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-slate-500">Lower-order C1–C3</div>
-            <div className="mt-0.5 text-lg font-semibold tabular-nums text-slate-300">
+          <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-text-muted">Lower-order C1–C3</div>
+            <div className="mt-0.5 text-lg font-semibold tabular-nums text-text-primary">
               {pct(balance?.lower_order_pct, 1)}
             </div>
           </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-slate-500">Higher-order C4–C6</div>
+          <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+            <div className="text-[11px] uppercase tracking-wide text-text-muted">Higher-order C4–C6</div>
             <div
               className={cn(
                 'mt-0.5 text-lg font-semibold tabular-nums',
-                thin ? 'text-amber-400' : 'text-slate-300'
+                thin ? 'text-warning-text' : 'text-text-primary'
               )}
             >
               {pct(balance?.higher_order_pct, 1)}
@@ -673,7 +635,7 @@ function CognitiveDemandHeatmap({ questions, balance }) {
         </div>
 
         {thin ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2 text-[12px] leading-relaxed text-amber-200">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning-border bg-warning-fill px-3 py-2 text-[12px] leading-relaxed text-warning-text">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             Under 30% of the marks reach C4 and above. The paper cannot evidence the higher-order
             outcomes it is meant to assess.
@@ -689,20 +651,20 @@ function LintRow({ question, expanded, onToggle }) {
   const bloomDrift = question.detected_bloom_level !== question.assigned_bloom_level;
 
   return (
-    <li className={cn('border-l-2 bg-slate-900', tone.border)}>
+    <li className={cn('border-l-2 bg-bg-surface', tone.border)}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="focus-ring flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-800/40"
+        className="focus-ring flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-bg-hover"
       >
-        <span className="w-12 shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums text-slate-200">
+        <span className="w-12 shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums text-text-primary">
           {question.q_number}
         </span>
 
         <span
           className={cn(
-            'min-w-0 flex-1 text-[13px] leading-relaxed text-slate-300',
+            'min-w-0 flex-1 text-[13px] leading-relaxed text-text-secondary',
             !expanded && 'line-clamp-2'
           )}
         >
@@ -710,7 +672,7 @@ function LintRow({ question, expanded, onToggle }) {
         </span>
 
         <span className="flex shrink-0 items-center gap-2 pt-0.5">
-          <span className="text-[12px] tabular-nums text-slate-400">{num(question.marks, 0)}m</span>
+          <span className="text-[12px] tabular-nums text-text-muted">{num(question.marks, 0)}m</span>
           {question.flags?.length ? (
             <span className={cn('text-[11px] tabular-nums', tone.text)}>
               {question.flags.length}
@@ -718,7 +680,7 @@ function LintRow({ question, expanded, onToggle }) {
           ) : null}
           <Badge variant={tone.badge}>{tone.label}</Badge>
           <ChevronDown
-            className={cn('h-4 w-4 text-slate-500 transition-transform', expanded && 'rotate-180')}
+            className={cn('h-4 w-4 text-text-muted transition-transform', expanded && 'rotate-180')}
             strokeWidth={1.75}
             aria-hidden="true"
           />
@@ -726,13 +688,13 @@ function LintRow({ question, expanded, onToggle }) {
       </button>
 
       {expanded ? (
-        <div className="space-y-3 border-t border-slate-800/70 px-3 py-3 pl-[3.75rem]">
-          <p className="text-[13px] leading-relaxed text-slate-300">{question.text}</p>
+        <div className="space-y-3 border-t border-border-default px-3 py-3 pl-[3.75rem]">
+          <p className="text-[13px] leading-relaxed text-text-primary">{question.text}</p>
 
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="text-slate-500">Tagged</span>
+            <span className="text-text-muted">Tagged</span>
             <Badge>{BLOOM_LABELS[question.assigned_bloom_level] ?? question.assigned_bloom_level}</Badge>
-            <span className="text-slate-500">Detected</span>
+            <span className="text-text-muted">Detected</span>
             <Badge variant={bloomDrift ? tone.badge : 'neutral'}>
               {BLOOM_LABELS[question.detected_bloom_level] ?? question.detected_bloom_level}
             </Badge>
@@ -750,17 +712,17 @@ function LintRow({ question, expanded, onToggle }) {
                       aria-hidden="true"
                     />
                     <div className="min-w-0">
-                      <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                      <span className="text-[10px] uppercase tracking-wide text-text-muted">
                         {flag.type.replace(/_/g, ' ')}
                       </span>
-                      <p className="text-[12px] leading-relaxed text-slate-300">{flag.message}</p>
+                      <p className="text-[12px] leading-relaxed text-text-secondary">{flag.message}</p>
                     </div>
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <p className="flex items-center gap-2 text-[12px] text-emerald-400">
+            <p className="flex items-center gap-2 text-[12px] text-pass-text">
               <Check className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
               No defects found on this question.
             </p>
@@ -792,12 +754,12 @@ function LintReport({ questions }) {
         title="Lint report"
         subtitle="One row per question. Flagged questions open by default."
         action={
-          <span className="text-[11px] tabular-nums text-slate-500">
+          <span className="text-[11px] tabular-nums text-text-muted">
             {defective.length} of {questions?.length ?? 0} flagged
           </span>
         }
       />
-      <ul className="divide-y divide-slate-800/70">
+      <ul className="divide-y divide-border-default">
         {(questions ?? []).map((question) => (
           <LintRow
             key={question.q_number}
@@ -822,12 +784,12 @@ function DuplicateCard({ duplicate, draftText }) {
     <article
       className={cn(
         'rounded-lg border p-3',
-        severe ? 'border-rose-400/30 bg-rose-400/[0.04]' : 'border-amber-400/30 bg-amber-400/[0.04]'
+        severe ? 'border-critical-border bg-critical-fill' : 'border-warning-border bg-warning-fill'
       )}
     >
       <header className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-slate-100">
-          <Files className={cn('h-3.5 w-3.5', severe ? 'text-rose-400' : 'text-amber-400')} strokeWidth={1.75} />
+        <h3 className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-text-heading">
+          <Files className={cn('h-3.5 w-3.5', severe ? 'text-critical-text' : 'text-warning-text')} strokeWidth={1.75} />
           Question {duplicate.draft_q} repeats {duplicate.matched_year}
         </h3>
         <Badge variant={severe ? 'critical' : 'warning'} dot>
@@ -836,31 +798,31 @@ function DuplicateCard({ duplicate, draftText }) {
       </header>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
-          <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-border-default bg-bg-subtle p-2.5">
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-text-muted">
             Draft · Q{duplicate.draft_q}
           </div>
-          <p className="text-[12px] leading-relaxed text-slate-300">
+          <p className="text-[12px] leading-relaxed text-text-secondary">
             {draftText ?? 'The draft question is not in the audited question list.'}
           </p>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-950 p-2.5">
-          <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
+        <div className="rounded-lg border border-border-default bg-bg-subtle p-2.5">
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-text-muted">
             {duplicate.matched_year}
           </div>
-          <p className="text-[12px] leading-relaxed text-slate-300">{duplicate.matched_text}</p>
+          <p className="text-[12px] leading-relaxed text-text-secondary">{duplicate.matched_text}</p>
         </div>
       </div>
 
       <div className="mt-3">
         <div className="mb-1 flex items-center justify-between text-[11px]">
-          <span className="text-slate-500">Overlap severity</span>
-          <span className={cn('tabular-nums', severe ? 'text-rose-300' : 'text-amber-300')}>
+          <span className="text-text-muted">Overlap severity</span>
+          <span className={cn('tabular-nums font-semibold', severe ? 'text-critical-text' : 'text-warning-text')}>
             {pct(overlap, 0)}
           </span>
         </div>
         <div
-          className="h-2 w-full overflow-hidden rounded-sm bg-slate-800"
+          className="h-2 w-full overflow-hidden rounded-sm bg-bg-subtle border border-border-default"
           role="meter"
           aria-valuenow={Math.round(overlap)}
           aria-valuemin={0}
@@ -868,7 +830,7 @@ function DuplicateCard({ duplicate, draftText }) {
           aria-label="Overlap severity"
         >
           <div
-            className={cn('h-full rounded-sm', severe ? 'bg-rose-400' : 'bg-amber-400')}
+            className={cn('h-full rounded-sm', severe ? 'bg-critical-border' : 'bg-warning-border')}
             style={{ width: `${overlap}%` }}
           />
         </div>
@@ -879,7 +841,7 @@ function DuplicateCard({ duplicate, draftText }) {
           type="button"
           onClick={() => setShowRewrite((value) => !value)}
           aria-expanded={showRewrite}
-          className="focus-ring flex items-center gap-1.5 text-[12px] font-medium text-slate-300 hover:text-slate-100"
+          className="focus-ring flex items-center gap-1.5 text-[12px] font-medium text-text-secondary hover:text-text-heading"
         >
           <ChevronDown
             className={cn('h-3.5 w-3.5 transition-transform', showRewrite && 'rotate-180')}
@@ -890,8 +852,8 @@ function DuplicateCard({ duplicate, draftText }) {
         </button>
 
         {showRewrite ? (
-          <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950 p-2.5">
-            <p className="text-[12px] leading-relaxed text-slate-300">
+          <div className="mt-2 rounded-lg border border-border-default bg-bg-subtle p-2.5">
+            <p className="text-[12px] leading-relaxed text-text-primary">
               {duplicate.rewrite_suggestion}
             </p>
             <Button
@@ -918,7 +880,7 @@ function DuplicationAlerts({ duplicates, questions }) {
         title="Duplication alerts"
         subtitle="Draft questions matched against papers already in circulation"
         action={
-          <span className="text-[11px] tabular-nums text-slate-500">{duplicates?.length ?? 0}</span>
+          <span className="text-[11px] tabular-nums text-text-muted">{duplicates?.length ?? 0}</span>
         }
       />
       {duplicates?.length ? (
@@ -982,7 +944,7 @@ function ScorecardSkeleton({ stage }) {
 
       <Card>
         <CardHeader icon={FileSearch} title="Lint report" subtitle={stage} />
-        <div className="divide-y divide-slate-800/70">
+        <div className="divide-y divide-border-default">
           {Array.from({ length: 5 }).map((_, index) => (
             <div key={index} className="flex items-center gap-3 px-3 py-3">
               <Skeleton className="h-3.5 w-8" />
@@ -1000,17 +962,6 @@ function ScorecardSkeleton({ stage }) {
  * Page
  * ======================================================================= */
 
-/**
- * OWNER: moderation dev.
- *
- * POST /audit/exam-moderation { exam_id } -> ExamModerationReport.
- *
- * The left pane is a local drafting surface: it holds the paper as authored and
- * reconciles the mark total live, with no network call. The audit itself keys
- * off `exam_id` — the endpoint takes no question payload — so editing the rows
- * changes what the moderator sees on the left, not what the backend scores.
- * Loading an exam is therefore what arms the run button.
- */
 export default function ExamModerationPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
@@ -1035,7 +986,6 @@ export default function ExamModerationPage() {
   const report = auditMutation.data;
   const isAuditing = auditMutation.isPending;
 
-  /* --- staged status text while the audit runs ------------------------- */
   const [stage, setStage] = useState(0);
 
   useEffect(() => {
@@ -1048,7 +998,6 @@ export default function ExamModerationPage() {
     return () => clearInterval(timer);
   }, [isAuditing]);
 
-  /* --- editor plumbing -------------------------------------------------- */
   const jsonValidity = useMemo(() => {
     if (mode !== 'json') return { ok: true, count: questions.length };
     const result = parseQuestionsJson(jsonDraft);
@@ -1065,8 +1014,6 @@ export default function ExamModerationPage() {
     setMode(next);
   };
 
-  // While the JSON pane is authoritative, every valid parse is committed
-  // straight into `questions` so the mark footer stays live in both modes.
   const onJsonChange = (value) => {
     setJsonDraft(value);
     const result = parseQuestionsJson(value);
@@ -1158,7 +1105,6 @@ export default function ExamModerationPage() {
       setQuestions(rows);
       setJsonDraft(serialize(rows));
 
-      // Trigger deterministic real-time moderation audit immediately
       auditMutation.mutate({
         questions: rows.map(toDraftQuestion),
         declared_total: 70,
@@ -1203,7 +1149,6 @@ export default function ExamModerationPage() {
       setQuestions(rows);
       setJsonDraft(serialize(rows));
 
-      // Immediately run real-time moderation
       auditMutation.mutate({
         questions: rows.map(toDraftQuestion),
         declared_total: 70,
@@ -1219,7 +1164,6 @@ export default function ExamModerationPage() {
     event.target.value = '';
   };
 
-  // If ?autorun=1 is in the URL, automatically load and audit the seeded draft exam
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('autorun') === '1') {
@@ -1227,13 +1171,11 @@ export default function ExamModerationPage() {
     }
   }, []);
 
-  /** CLO options: the declared set plus anything the loaded paper actually uses. */
   const clos = useMemo(() => {
     const used = questions.map((question) => question.assigned_clo).filter(Boolean);
     return [...new Set([...DEFAULT_CLOS, ...used])].sort();
   }, [questions]);
 
-  /** q_number -> verdict, so the editor can echo the scorecard's judgement. */
   const verdictByQuestion = useMemo(() => {
     const map = new Map();
     for (const question of report?.questions ?? []) {
@@ -1246,7 +1188,6 @@ export default function ExamModerationPage() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[45fr_55fr] lg:items-start">
-      {/* Hidden File Input for .json and .csv uploads */}
       <input
         type="file"
         ref={fileInputRef}
@@ -1266,7 +1207,7 @@ export default function ExamModerationPage() {
               : 'Upload an exam paper, pick a sample, or draft from scratch.'
           }
           action={
-            <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+            <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-subtle p-0.5">
               {['structured', 'json'].map((option) => (
                 <button
                   key={option}
@@ -1276,8 +1217,8 @@ export default function ExamModerationPage() {
                   className={cn(
                     'focus-ring rounded px-2 py-1 text-[12px] font-medium transition-colors',
                     mode === option
-                      ? 'bg-slate-800 text-amber-400'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-bg-surface text-action-primary'
+                      : 'text-text-muted hover:text-text-secondary'
                   )}
                 >
                   {option === 'structured' ? 'Structured' : 'Raw JSON'}
@@ -1288,7 +1229,6 @@ export default function ExamModerationPage() {
         />
 
         <CardBody className="space-y-3">
-          {/* Action Bar: File Upload + 1-Click Samples + Demo */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
@@ -1305,7 +1245,7 @@ export default function ExamModerationPage() {
               icon={AlertTriangle}
               loading={loadingDraft}
               onClick={() => loadSample('defective')}
-              className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+              className="border-warning-border text-warning-text hover:bg-warning-fill"
             >
               Defective Sample
             </Button>
@@ -1316,7 +1256,7 @@ export default function ExamModerationPage() {
               icon={Check}
               loading={loadingDraft}
               onClick={() => loadSample('balanced')}
-              className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+              className="border-pass-border text-pass-text hover:bg-pass-fill"
             >
               Balanced Sample
             </Button>
@@ -1339,35 +1279,34 @@ export default function ExamModerationPage() {
             ) : null}
           </div>
 
-          {/* Sample Download Links */}
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
-            <span className="font-medium text-slate-300">Templates:</span>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border-default bg-bg-subtle px-3 py-1.5 text-[11px] text-text-muted">
+            <span className="font-medium text-text-secondary">Templates:</span>
             <a
               href="/samples/sample_exam_defective.csv"
               download="sample_exam_defective.csv"
-              className="inline-flex items-center gap-1 font-mono text-amber-400/90 underline decoration-amber-400/40 hover:text-amber-300"
+              className="inline-flex items-center gap-1 font-mono text-warning-text underline decoration-warning-border hover:opacity-80"
             >
               <Download className="h-3 w-3" /> Defective (.csv)
             </a>
-            <span className="text-slate-600">·</span>
+            <span className="text-text-muted">·</span>
             <a
               href="/samples/sample_exam_balanced.csv"
               download="sample_exam_balanced.csv"
-              className="inline-flex items-center gap-1 font-mono text-emerald-400/90 underline decoration-emerald-400/40 hover:text-emerald-300"
+              className="inline-flex items-center gap-1 font-mono text-pass-text underline decoration-pass-border hover:opacity-80"
             >
               <Download className="h-3 w-3" /> Balanced (.csv)
             </a>
-            <span className="text-slate-600">·</span>
+            <span className="text-text-muted">·</span>
             <a
               href="/samples/sample_exam_defective.json"
               download="sample_exam_defective.json"
-              className="inline-flex items-center gap-1 font-mono text-slate-300 underline hover:text-slate-100"
+              className="inline-flex items-center gap-1 font-mono text-text-secondary underline hover:text-text-heading"
             >
               <Download className="h-3 w-3" /> Defective (.json)
             </a>
           </div>
 
-          {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
+          {loadError ? <p className="text-[11px] text-critical-text">{loadError}</p> : null}
 
           {mode === 'json' ? (
             <JsonEditor value={jsonDraft} onChange={onJsonChange} validity={jsonValidity} />
@@ -1400,7 +1339,7 @@ export default function ExamModerationPage() {
           )}
         </CardBody>
 
-        <div className="space-y-3 border-t border-slate-800 p-4">
+        <div className="space-y-3 border-t border-border-default p-4">
           <MarkTotalFooter questions={questions} declaredTotal={exam?.total_marks ?? 70} />
 
           <Button
@@ -1415,7 +1354,7 @@ export default function ExamModerationPage() {
           </Button>
 
           {!exam && questions.length === 0 ? (
-            <p className="text-center text-[11px] text-slate-500">
+            <p className="text-center text-[11px] text-text-muted">
               Upload a paper or load a sample to run real-time moderation.
             </p>
           ) : null}

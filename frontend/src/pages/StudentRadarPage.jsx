@@ -90,12 +90,12 @@ function parseCsvStudents(source) {
 
 /**
  * The contract's `Severity` is the risk level. The advisor-facing wording is
- * Critical / Moderate / Safe, so the mapping lives here and nowhere else.
+ * Critical / Moderate / Safe, using semantic theme variables.
  */
 const LEVELS = {
-  high: { key: 'high', label: 'Critical', variant: 'critical', text: 'text-rose-400', hex: '#fb7185' },
-  medium: { key: 'medium', label: 'Moderate', variant: 'warning', text: 'text-amber-400', hex: '#fbbf24' },
-  low: { key: 'low', label: 'Safe', variant: 'pass', text: 'text-emerald-400', hex: '#34d399' },
+  high: { key: 'high', label: 'Critical', variant: 'critical', text: 'text-critical-text', hex: 'var(--critical-border)' },
+  medium: { key: 'medium', label: 'Moderate', variant: 'warning', text: 'text-warning-text', hex: 'var(--warning-border)' },
+  low: { key: 'low', label: 'Safe', variant: 'pass', text: 'text-pass-text', hex: 'var(--pass-border)' },
 };
 
 const LEVEL_ORDER = { high: 3, medium: 2, low: 1 };
@@ -116,20 +116,16 @@ const COLUMNS = [
  * The framing notice — persistent, never dismissible
  * ======================================================================= */
 
-/**
- * What this page is and is not. It stays on screen in every state, including
- * idle and error, because the constraint holds whether or not data is loaded.
- */
 function PrivacyNotice() {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.04] px-4 py-3">
-      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" strokeWidth={1.75} aria-hidden="true" />
+    <div className="flex items-start gap-3 rounded-lg border border-border-strong bg-bg-subtle px-4 py-3">
+      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-action-primary" strokeWidth={1.75} aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-[13px] leading-relaxed text-slate-200">
+        <p className="text-[13px] leading-relaxed text-text-primary font-medium">
           Academic indicators only. No identity or personal data is processed. All flags require
           advisor review before any action.
         </p>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
           Students are addressed by pseudonymous hash. Attendance, quiz and midterm figures are the
           only inputs; nothing here is a decision, and nothing here is evidence about a person.
         </p>
@@ -149,12 +145,12 @@ function AttendanceCell({ value }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className={cn('w-10 shrink-0 text-right tabular-nums', low ? 'text-rose-400' : 'text-slate-200')}>
+      <span className={cn('w-10 shrink-0 text-right tabular-nums', low ? 'text-critical-text' : 'text-text-primary')}>
         {pct(value, 0)}
       </span>
-      <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-sm bg-slate-800" aria-hidden="true">
+      <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-sm bg-bg-subtle border border-border-default" aria-hidden="true">
         <span
-          className={cn('block h-full rounded-sm', low ? 'bg-rose-400' : 'bg-slate-500')}
+          className={cn('block h-full rounded-sm', low ? 'bg-critical-border' : 'bg-action-primary')}
           style={{ width: `${width}%` }}
         />
       </span>
@@ -165,10 +161,10 @@ function AttendanceCell({ value }) {
 /** Three quiz scores as a sparkline, stroked by direction of travel. */
 function QuizTrendCell({ student }) {
   const slope = quizSlope(student);
-  const stroke = slope < 0 ? '#fb7185' : slope > 0 ? '#34d399' : '#64748b';
+  const stroke = slope < 0 ? 'var(--critical-border)' : slope > 0 ? 'var(--pass-border)' : 'var(--text-muted)';
   const data = (student.quiz_trend ?? []).map((value, index) => ({ index, value }));
 
-  if (!data.length) return <span className="text-slate-600">—</span>;
+  if (!data.length) return <span className="text-text-muted">—</span>;
 
   return (
     <div className="flex items-center gap-2">
@@ -183,7 +179,7 @@ function QuizTrendCell({ student }) {
           isAnimationActive={false}
         />
       </LineChart>
-      <span className={cn('tabular-nums text-[12px]', slope < 0 ? 'text-rose-400' : 'text-slate-400')}>
+      <span className={cn('tabular-nums text-[12px]', slope < 0 ? 'text-critical-text' : 'text-text-secondary')}>
         {slope > 0 ? '+' : ''}
         {num(slope, 0)}
       </span>
@@ -200,7 +196,7 @@ function RiskScoreCell({ value, level }) {
       <span className={cn('w-7 shrink-0 text-right text-[13px] font-medium tabular-nums', tone.text)}>
         {num(value, 0)}
       </span>
-      <span className="h-1 w-20 shrink-0 overflow-hidden rounded-sm bg-slate-800" aria-hidden="true">
+      <span className="h-1 w-20 shrink-0 overflow-hidden rounded-sm bg-bg-subtle border border-border-default" aria-hidden="true">
         <span
           className="block h-full rounded-sm"
           style={{ width: `${width}%`, backgroundColor: tone.hex }}
@@ -214,10 +210,10 @@ function RiskScoreCell({ value, level }) {
 function MlProbabilityCell({ value }) {
   return (
     <span className="group inline-flex items-center justify-end gap-1.5">
-      <span className="tabular-nums text-slate-200">{ratioPct(value, 0)}</span>
+      <span className="tabular-nums text-text-primary">{ratioPct(value, 0)}</span>
       <span
         title="Logistic regression confidence"
-        className="rounded border border-slate-700 bg-slate-800 px-1 text-[10px] font-medium text-slate-400 opacity-0 transition-opacity group-hover:opacity-100"
+        className="rounded border border-border-default bg-bg-subtle px-1 text-[10px] font-medium text-text-muted opacity-0 transition-opacity group-hover:opacity-100"
       >
         LR
       </span>
@@ -241,7 +237,7 @@ function SortableHeader({ column, sort, onSort }) {
         aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
         className={cn(
           'focus-ring inline-flex items-center gap-1 rounded text-[11px] font-medium uppercase tracking-wide transition-colors',
-          active ? 'text-amber-400' : 'text-slate-500 hover:text-slate-300'
+          active ? 'text-action-primary' : 'text-text-muted hover:text-text-secondary'
         )}
       >
         {column.label}
@@ -277,11 +273,11 @@ function StudentTable({ students, sort, onSort, onSelect, selectedHash }) {
             aria-label={`Open risk details for ${student.student_hash}`}
             className={cn(
               'focus-ring cursor-pointer border-l-2',
-              student.risk_level === 'high' ? 'border-l-rose-400' : 'border-l-transparent'
+              student.risk_level === 'high' ? 'border-l-critical-border' : 'border-l-transparent'
             )}
           >
-            <TD className="font-medium text-slate-100">{student.student_hash}</TD>
-            <TD className="whitespace-nowrap text-slate-400">{student.section_name}</TD>
+            <TD className="font-medium text-text-heading">{student.student_hash}</TD>
+            <TD className="whitespace-nowrap text-text-secondary">{student.section_name}</TD>
             <TD>
               <AttendanceCell value={student.attendance_pct} />
             </TD>
@@ -320,40 +316,40 @@ function StudentCards({ students, onSelect }) {
             type="button"
             onClick={() => onSelect(student)}
             className={cn(
-              'focus-ring w-full rounded-lg border border-l-2 border-slate-800 bg-slate-950 p-3 text-left transition-colors hover:border-slate-700',
-              student.risk_level === 'high' ? 'border-l-rose-400' : 'border-l-slate-800'
+              'focus-ring w-full rounded-lg border border-l-2 border-border-default bg-bg-surface p-3 text-left transition-colors hover:border-border-strong',
+              student.risk_level === 'high' ? 'border-l-critical-border' : 'border-l-border-default'
             )}
           >
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] font-semibold text-slate-100">{student.student_hash}</span>
+              <span className="text-[13px] font-semibold text-text-heading">{student.student_hash}</span>
               <SeverityPill severity={student.risk_level} label={LEVELS[student.risk_level]?.label} />
             </div>
 
-            <div className="mt-1 text-[11px] text-slate-500">{student.section_name}</div>
+            <div className="mt-1 text-[11px] text-text-muted">{student.section_name}</div>
 
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-slate-500">Attendance</dt>
+                <dt className="text-text-muted">Attendance</dt>
                 <dd>
                   <AttendanceCell value={student.attendance_pct} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-slate-500">Midterm</dt>
-                <dd className="tabular-nums text-slate-200">{pct(student.midterm_pct, 1)}</dd>
+                <dt className="text-text-muted">Midterm</dt>
+                <dd className="tabular-nums text-text-primary">{pct(student.midterm_pct, 1)}</dd>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-slate-500">Quizzes</dt>
+                <dt className="text-text-muted">Quizzes</dt>
                 <dd>
                   <QuizTrendCell student={student} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-slate-500">ML</dt>
-                <dd className="tabular-nums text-slate-200">{ratioPct(student.ml_probability, 0)}</dd>
+                <dt className="text-text-muted">ML</dt>
+                <dd className="tabular-nums text-text-primary">{ratioPct(student.ml_probability, 0)}</dd>
               </div>
               <div className="col-span-2 flex items-center justify-between gap-2">
-                <dt className="text-slate-500">Risk score</dt>
+                <dt className="text-text-muted">Risk score</dt>
                 <dd>
                   <RiskScoreCell value={student.risk_score} level={student.risk_level} />
                 </dd>
@@ -376,7 +372,7 @@ function RiskFactorBreakdown({ student }) {
   const widest = Math.max(...factors.map((factor) => factor.points), 1);
 
   if (!factors.length) {
-    return <p className="text-[12px] text-slate-500">The audit returned no triggers for this student.</p>;
+    return <p className="text-[12px] text-text-muted">The audit returned no triggers for this student.</p>;
   }
 
   return (
@@ -385,12 +381,12 @@ function RiskFactorBreakdown({ student }) {
         {factors.map((factor) => (
           <li key={factor.trigger}>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="min-w-0 text-[12px] font-medium text-slate-200">{factor.label}</span>
+              <span className="min-w-0 text-[12px] font-medium text-text-primary">{factor.label}</span>
               <span className={cn('shrink-0 text-[13px] font-semibold tabular-nums', tone.text)}>
                 +{factor.points}
               </span>
             </div>
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-sm bg-slate-800">
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-sm bg-bg-subtle border border-border-default">
               <div
                 className="h-full rounded-sm"
                 style={{
@@ -399,14 +395,14 @@ function RiskFactorBreakdown({ student }) {
                 }}
               />
             </div>
-            <p className="mt-1 text-[11px] leading-snug text-slate-500">{factor.detail}</p>
+            <p className="mt-1 text-[11px] leading-snug text-text-muted">{factor.detail}</p>
           </li>
         ))}
       </ul>
 
-      <p className="mt-3 border-t border-slate-800 pt-2 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-3 border-t border-border-default pt-2 text-[11px] leading-relaxed text-text-muted">
         Contributions sum to the reported risk score of{' '}
-        <span className="tabular-nums text-slate-400">{num(student.risk_score, 0)}</span>. The audit
+        <span className="tabular-nums text-text-secondary">{num(student.risk_score, 0)}</span>. The audit
         returns which rules fired but not their weights, so these points are reconstructed from this
         student&rsquo;s published indicators — treat them as an explanation of the score, not as a
         second measurement.
@@ -418,9 +414,9 @@ function RiskFactorBreakdown({ student }) {
 function TrajectoryTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-[12px] shadow-lg">
-      <div className="font-medium text-slate-100">{label}</div>
-      <div className="tabular-nums text-slate-400">{pct(payload[0].value, 1)}</div>
+    <div className="rounded-lg border border-border-default bg-bg-surface px-2.5 py-1.5 text-[12px] shadow-lg">
+      <div className="font-medium text-text-heading">{label}</div>
+      <div className="tabular-nums text-text-muted">{pct(payload[0].value, 1)}</div>
     </div>
   );
 }
@@ -436,26 +432,26 @@ function PerformanceTrajectory({ student }) {
           <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -22 }}>
             <XAxis
               dataKey="label"
-              tick={{ fill: '#64748b', fontSize: 11 }}
-              axisLine={{ stroke: '#1e293b' }}
+              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
+              axisLine={{ stroke: 'var(--border-default)' }}
               tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fill: '#64748b', fontSize: 11 }}
+              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<TrajectoryTooltip />} cursor={{ stroke: '#334155' }} />
+            <Tooltip content={<TrajectoryTooltip />} cursor={{ stroke: 'var(--border-strong)' }} />
 
             {/* Shade from the turn downwards to the end of the series. */}
             {decline ? (
               <ReferenceArea
                 x1={decline.from}
                 x2={decline.to}
-                fill="#fb7185"
+                fill="var(--critical-border)"
                 fillOpacity={0.12}
-                stroke="#fb7185"
+                stroke="var(--critical-border)"
                 strokeOpacity={0.25}
               />
             ) : null}
@@ -463,9 +459,9 @@ function PerformanceTrajectory({ student }) {
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#e2e8f0"
+              stroke="var(--action-primary)"
               strokeWidth={2}
-              dot={{ r: 3, fill: '#e2e8f0', stroke: 'none' }}
+              dot={{ r: 3, fill: 'var(--action-primary)', stroke: 'none' }}
               activeDot={{ r: 4 }}
               isAnimationActive={false}
             />
@@ -474,12 +470,12 @@ function PerformanceTrajectory({ student }) {
       </div>
 
       {decline ? (
-        <p className="mt-1 text-[11px] leading-relaxed text-rose-300">
+        <p className="mt-1 text-[11px] leading-relaxed text-critical-text">
           Steepest fall begins at {decline.from}: {num(decline.drop, 1)} points lost by{' '}
           {decline.to.toLowerCase()}.
         </p>
       ) : (
-        <p className="mt-1 text-[11px] text-slate-500">No decline in this trajectory.</p>
+        <p className="mt-1 text-[11px] text-text-muted">No decline in this trajectory.</p>
       )}
     </div>
   );
@@ -535,67 +531,67 @@ function DetailDrawer({ student, onClose }) {
   return (
     <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true">
       <div
-        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <aside
         className={cn(
-          'relative z-10 flex h-full w-full flex-col border-slate-800 bg-slate-900 transition-transform duration-200 ease-out',
+          'relative z-10 flex h-full w-full flex-col border-border-default bg-bg-surface transition-transform duration-200 ease-out shadow-lg',
           isWide ? 'max-w-xl border-l' : 'max-w-none',
           entered ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-slate-800 px-4 py-3">
+        <header className="flex items-start justify-between gap-3 border-b border-border-default px-4 py-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-sm font-semibold tracking-tight text-slate-100">
+              <h2 className="truncate text-sm font-semibold tracking-tight text-text-heading">
                 {student.student_hash}
               </h2>
               <SeverityPill severity={student.risk_level} label={tone.label} />
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">{student.section_name}</p>
+            <p className="mt-0.5 text-xs text-text-muted">{student.section_name}</p>
           </div>
           <Button variant="ghost" size="sm" icon={X} onClick={onClose} aria-label="Close details" />
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">Rule score</div>
+            <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-text-muted">Rule score</div>
               <div className={cn('mt-0.5 text-2xl font-semibold tabular-nums', tone.text)}>
                 {num(student.risk_score, 0)}
-                <span className="text-sm font-normal text-slate-500"> /100</span>
+                <span className="text-sm font-normal text-text-muted"> /100</span>
               </div>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">
+            <div className="rounded-lg border border-border-default bg-bg-subtle px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-text-muted">
                 Model confidence
               </div>
-              <div className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-200">
+              <div className="mt-0.5 text-2xl font-semibold tabular-nums text-text-primary">
                 {ratioPct(student.ml_probability, 0)}
               </div>
-              <div className="text-[10px] text-slate-600">Logistic regression</div>
+              <div className="text-[10px] text-text-muted">Logistic regression</div>
             </div>
           </div>
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
               Risk factor breakdown
             </h3>
             <RiskFactorBreakdown student={student} />
           </section>
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
               Performance trajectory
             </h3>
             <PerformanceTrajectory student={student} />
           </section>
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
               Triggers
             </h3>
             <ul className="space-y-1.5">
@@ -606,15 +602,15 @@ function DetailDrawer({ student, onClose }) {
                     strokeWidth={1.75}
                     aria-hidden="true"
                   />
-                  <span className="text-[12px] leading-relaxed text-slate-300">{trigger}</span>
+                  <span className="text-[12px] leading-relaxed text-text-secondary">{trigger}</span>
                 </li>
               ))}
             </ul>
           </section>
 
-          <section className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+          <section className="rounded-lg border border-border-default bg-bg-subtle p-3">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">
                 Recommended intervention
               </h3>
               <Button
@@ -630,10 +626,10 @@ function DetailDrawer({ student, onClose }) {
             <p className={cn('mt-2 text-[13px] font-medium leading-relaxed', tone.text)}>
               {student.recommended_action}
             </p>
-            <p className="mt-2 text-[13px] leading-relaxed text-slate-300">{student.narrative}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-text-primary">{student.narrative}</p>
           </section>
 
-          <p className="text-[11px] leading-relaxed text-slate-500">
+          <p className="text-[11px] leading-relaxed text-text-muted">
             This drawer describes academic indicators for a pseudonymous record. It is not a decision
             and not a finding about a person — an advisor reviews it before anything follows.
           </p>
@@ -647,15 +643,6 @@ function DetailDrawer({ student, onClose }) {
  * Page
  * ======================================================================= */
 
-/**
- * OWNER: student radar dev.
- *
- * POST /audit/vulnerable-students { course_id } -> VulnerableStudentsReport.
- *
- * Everything on this page is keyed by `student_hash`. No name, email, or
- * identity attribute is requested, rendered, or copied out — the advisor note
- * carries the hash and the academic indicators only.
- */
 export default function StudentRadarPage() {
   const fileInputRef = useRef(null);
   const [sort, setSort] = useState({ column: 'risk_score', direction: 'desc' });
@@ -789,12 +776,11 @@ export default function StudentRadarPage() {
     setSort((current) =>
       current.column === columnId
         ? { column: columnId, direction: current.direction === 'asc' ? 'desc' : 'asc' }
-        : // Text sorts read best ascending; every measure reads worst-first.
-          { column: columnId, direction: columnId === 'student_hash' || columnId === 'section_name' ? 'asc' : 'desc' }
+        : { column: columnId, direction: columnId === 'student_hash' || columnId === 'section_name' ? 'asc' : 'desc' }
     );
 
   const selectClass =
-    'focus-ring h-8 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[13px] text-slate-200 transition-colors hover:border-slate-700 disabled:cursor-not-allowed disabled:text-slate-600';
+    'focus-ring h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-[13px] text-text-primary transition-colors hover:border-border-strong disabled:cursor-not-allowed disabled:text-text-muted';
 
   return (
     <div className="space-y-4">
@@ -847,7 +833,7 @@ export default function StudentRadarPage() {
               icon={AlertCircle}
               loading={uploading}
               onClick={() => loadSample('high-risk')}
-              className="border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+              className="border-critical-border text-critical-text hover:bg-critical-fill"
             >
               High-Risk Cohort Sample
             </Button>
@@ -858,44 +844,44 @@ export default function StudentRadarPage() {
               icon={Check}
               loading={uploading}
               onClick={() => loadSample('safe')}
-              className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+              className="border-pass-border text-pass-text hover:bg-pass-fill"
             >
               Safe Cohort Sample
             </Button>
           </div>
 
           {/* Template Download Links & Active Badge */}
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
-            <span className="font-medium text-slate-300">Templates:</span>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border-default bg-bg-subtle px-3 py-1.5 text-[11px] text-text-muted">
+            <span className="font-medium text-text-secondary">Templates:</span>
             <a
               href="/samples/students_high_risk_cohort.csv"
               download="students_high_risk_cohort.csv"
-              className="inline-flex items-center gap-1 font-mono text-rose-400/90 underline decoration-rose-400/40 hover:text-rose-300"
+              className="inline-flex items-center gap-1 font-mono text-critical-text underline decoration-critical-border hover:opacity-80"
             >
               <Download className="h-3 w-3" /> High-Risk (.csv)
             </a>
-            <span className="text-slate-600">·</span>
+            <span className="text-text-muted">·</span>
             <a
               href="/samples/students_safe_balanced_cohort.csv"
               download="students_safe_balanced_cohort.csv"
-              className="inline-flex items-center gap-1 font-mono text-emerald-400/90 underline decoration-emerald-400/40 hover:text-emerald-300"
+              className="inline-flex items-center gap-1 font-mono text-pass-text underline decoration-pass-border hover:opacity-80"
             >
               <Download className="h-3 w-3" /> Safe (.csv)
             </a>
             {activeCohortTitle ? (
               <>
-                <span className="text-slate-600">·</span>
-                <span className="font-semibold text-amber-400">{activeCohortTitle}</span>
+                <span className="text-text-muted">·</span>
+                <span className="font-semibold text-warning-text">{activeCohortTitle}</span>
               </>
             ) : null}
           </div>
 
-          {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
+          {loadError ? <p className="text-[11px] text-critical-text">{loadError}</p> : null}
 
           {students.length ? (
-            <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-800 pt-3">
+            <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-border-default pt-3">
               <label>
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-text-muted">
                   Section
                 </span>
                 <select
@@ -913,7 +899,7 @@ export default function StudentRadarPage() {
               </label>
 
               <label>
-                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-text-muted">
                   Risk level
                 </span>
                 <select
@@ -930,7 +916,7 @@ export default function StudentRadarPage() {
                 </select>
               </label>
 
-              <p className="pb-1.5 text-[11px] text-slate-500">
+              <p className="pb-1.5 text-[11px] text-text-muted">
                 Showing {visible.length} of {students.length} flagged records.
               </p>
             </div>
@@ -993,7 +979,7 @@ export default function StudentRadarPage() {
             title="Flagged records"
             subtitle="Click a row for the risk factor breakdown."
             action={
-              <span className="text-[11px] tabular-nums text-slate-500">
+              <span className="text-[11px] tabular-nums text-text-muted">
                 {report.at_risk_count} at risk
               </span>
             }

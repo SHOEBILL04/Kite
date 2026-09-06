@@ -3,9 +3,8 @@ import { cn } from '../../lib/cn.js';
 import { Skeleton } from './Skeleton.jsx';
 
 /**
- * The `ai_summary` string from any audit response. This is the only amber-bordered
- * panel in the app — it should read as the one interpretive voice on the page,
- * distinct from the measured numbers around it.
+ * AI Analysis Card.
+ * Uses --bg-subtle, 1px --border-strong, Sparkles in --green-500.
  *
  * @param {{summary?: string, title?: string, meta?: React.ReactNode,
  *          loading?: boolean, className?: string}} props
@@ -19,15 +18,15 @@ export function AiSummaryCard({
 }) {
   return (
     <section
-      className={cn('rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-4', className)}
+      className={cn('rounded-[8px] border border-border-strong bg-subtle p-5 shadow-elevation', className)}
       aria-label={title}
     >
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-400" strokeWidth={1.75} aria-hidden="true" />
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-300">{title}</h2>
+          <Sparkles className="h-4 w-4 text-green-500" strokeWidth={1.75} aria-hidden="true" />
+          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-muted">{title}</h2>
         </div>
-        {meta ? <div className="text-[11px] tabular-nums text-slate-500">{meta}</div> : null}
+        {meta ? <div className="text-[11px] tabular-nums text-muted">{meta}</div> : null}
       </header>
 
       {loading ? (
@@ -37,7 +36,7 @@ export function AiSummaryCard({
           <Skeleton className="h-3 w-4/5" />
         </div>
       ) : (
-        <p className="mt-2.5 text-[13px] leading-relaxed text-slate-300">{summary}</p>
+        <p className="mt-3 text-[14px] leading-[1.6] text-secondary">{summary}</p>
       )}
     </section>
   );

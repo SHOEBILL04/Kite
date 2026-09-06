@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowRight,
   Building2,
-  CheckCircle2,
   Lock,
   Mail,
   ShieldCheck,
@@ -96,7 +95,6 @@ export default function Register() {
     } catch (err) {
       setApiError(err.message || 'Registration failed.');
       if (err.errors) {
-        // Flatten Laravel { field: [msg1, msg2] } into { field: msg1 }
         const mapped = {};
         Object.entries(err.errors).forEach(([k, msgs]) => {
           mapped[k] = Array.isArray(msgs) ? msgs[0] : msgs;
@@ -109,22 +107,17 @@ export default function Register() {
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-950 text-slate-100 lg:flex-row">
-      {/* ====================================================================
-       * LEFT PANEL: 55% BRAND & ONBOARDING CONTEXT
-       * ==================================================================== */}
-      <div className="relative flex flex-col justify-between border-b border-slate-800/80 bg-slate-950 p-6 sm:p-10 lg:w-[50%] lg:border-b-0 lg:border-r lg:p-14">
-        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
-
+    <div className="flex min-h-screen w-full flex-col bg-canvas text-primary lg:flex-row">
+      {/* LEFT PANEL */}
+      <div className="relative flex flex-col justify-between border-b border-border-default bg-surface p-6 sm:p-10 lg:w-[50%] lg:border-b-0 lg:border-r lg:p-14">
         <div className="relative z-10">
-          {/* Brand */}
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400 text-base font-black tracking-wider text-slate-950 shadow-lg shadow-amber-400/20">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-action-primary text-action-text text-base font-bold shadow-elevation">
               CF
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold tracking-tight text-slate-100">
+                <span className="text-xl font-bold tracking-tight text-heading">
                   CogniFaculty
                 </span>
                 {USE_MOCK ? (
@@ -137,54 +130,52 @@ export default function Register() {
                   </Badge>
                 )}
               </div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-muted">
                 Institutional Onboarding Portal
               </div>
             </div>
           </div>
 
-          {/* Heading */}
           <div className="mt-10 lg:mt-16">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-xs font-medium text-amber-300">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-subtle px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5 text-green-500" />
               Faculty & Moderator Registration
             </div>
 
-            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-100 sm:text-4xl">
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
               Join the academic quality assurance{' '}
-              <span className="bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
+              <span className="text-green-500 font-bold">
                 network.
               </span>
             </h1>
 
-            <p className="mt-4 max-w-lg text-sm leading-relaxed text-slate-400">
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-secondary">
               Create an institutional account to participate in automated syllabus review,
               cross-section grading parity audits, and pre-examination quality moderation.
             </p>
           </div>
 
-          {/* Institutional Highlights */}
           <div className="mt-8 space-y-4">
-            <div className="flex items-start gap-3 rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div className="flex items-start gap-3 rounded-[8px] border border-border-default bg-surface p-3.5">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
               <div>
-                <h4 className="text-xs font-semibold text-slate-200">
+                <h4 className="text-xs font-semibold text-heading">
                   Role-Gated Moderation Workflows
                 </h4>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-secondary">
                   Assigned permissions for exam setters, department chairs, and university
                   moderation committee members.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg border border-slate-800/80 bg-slate-900/60 p-3.5">
-              <UserCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+            <div className="flex items-start gap-3 rounded-[8px] border border-border-default bg-surface p-3.5">
+              <UserCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
               <div>
-                <h4 className="text-xs font-semibold text-slate-200">
+                <h4 className="text-xs font-semibold text-heading">
                   Instant Institutional Access
                 </h4>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-secondary">
                   Automated token issuance allows immediate transition to the live quality
                   dashboard upon account creation.
                 </p>
@@ -193,30 +184,27 @@ export default function Register() {
           </div>
         </div>
 
-        <div className="relative z-10 mt-8 border-t border-slate-800/60 pt-4 text-xs text-slate-500">
+        <div className="relative z-10 mt-8 border-t border-border-default pt-4 text-xs text-muted">
           Department of Computer Science & Engineering · Academic Year 2025–2026
         </div>
       </div>
 
-      {/* ====================================================================
-       * RIGHT PANEL: 45% REGISTRATION FORM
-       * ==================================================================== */}
-      <div className="flex flex-1 flex-col justify-center p-6 sm:p-10 lg:w-[50%] lg:p-12">
+      {/* RIGHT PANEL */}
+      <div className="flex flex-1 flex-col justify-center p-6 sm:p-10 lg:w-[50%] lg:p-12 bg-canvas">
         <div className="mx-auto w-full max-w-md">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-100">Create Account</h2>
-            <p className="mt-1 text-xs text-slate-400">
+            <h2 className="text-2xl font-bold tracking-tight text-heading">Create Account</h2>
+            <p className="mt-1 text-xs text-muted">
               Enter your official academic details to register.
             </p>
           </div>
 
-          {/* API Error Banner */}
           {apiError ? (
             <div
               role="alert"
-              className="mt-4 flex items-start gap-2.5 rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-300"
+              className="mt-4 flex items-start gap-2.5 rounded-[8px] border border-critical-border bg-critical-bg p-3 text-xs text-critical-text"
             >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-critical-text" />
               <div className="leading-snug">{apiError}</div>
             </div>
           ) : null}
@@ -226,12 +214,12 @@ export default function Register() {
             <div>
               <label
                 htmlFor="reg-name"
-                className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                className="block text-xs font-medium uppercase tracking-wider text-muted"
               >
                 Full Name
               </label>
               <div className="relative mt-1">
-                <User className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <User className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                 <input
                   id="reg-name"
                   type="text"
@@ -239,15 +227,15 @@ export default function Register() {
                   onChange={handleChange('name')}
                   placeholder="Dr. Amina Rahman"
                   className={cn(
-                    'w-full rounded-lg border bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1',
+                    'w-full h-9 rounded-[8px] border bg-surface py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-border-focus',
                     fieldErrors.name
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
-                      : 'border-slate-800 focus:border-amber-400 focus:ring-amber-400'
+                      ? 'border-critical-border'
+                      : 'border-border-default'
                   )}
                 />
               </div>
               {fieldErrors.name ? (
-                <p className="mt-1 text-xs text-rose-400">{fieldErrors.name}</p>
+                <p className="mt-1 text-xs text-critical-text">{fieldErrors.name}</p>
               ) : null}
             </div>
 
@@ -255,12 +243,12 @@ export default function Register() {
             <div>
               <label
                 htmlFor="reg-email"
-                className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                className="block text-xs font-medium uppercase tracking-wider text-muted"
               >
                 Institutional Email
               </label>
               <div className="relative mt-1">
-                <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                 <input
                   id="reg-email"
                   type="email"
@@ -268,25 +256,24 @@ export default function Register() {
                   onChange={handleChange('email')}
                   placeholder="amina@aust.edu"
                   className={cn(
-                    'w-full rounded-lg border bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1',
+                    'w-full h-9 rounded-[8px] border bg-surface py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-border-focus',
                     fieldErrors.email
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
-                      : 'border-slate-800 focus:border-amber-400 focus:ring-amber-400'
+                      ? 'border-critical-border'
+                      : 'border-border-default'
                   )}
                 />
               </div>
               {fieldErrors.email ? (
-                <p className="mt-1 text-xs text-rose-400">{fieldErrors.email}</p>
+                <p className="mt-1 text-xs text-critical-text">{fieldErrors.email}</p>
               ) : null}
             </div>
 
-            {/* Role & Department (Side-by-side on sm+) */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* Role */}
               <div>
                 <label
                   htmlFor="reg-role"
-                  className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                  className="block text-xs font-medium uppercase tracking-wider text-muted"
                 >
                   Academic Role
                 </label>
@@ -294,7 +281,7 @@ export default function Register() {
                   id="reg-role"
                   value={form.role}
                   onChange={handleChange('role')}
-                  className="mt-1 h-[38px] w-full rounded-lg border border-slate-800 bg-slate-900 px-3 text-xs text-slate-200 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  className="mt-1 h-9 w-full rounded-[8px] border border-border-default bg-surface px-3 text-xs text-primary focus:border-border-focus focus:outline-none"
                 >
                   {ROLES.map((role) => (
                     <option key={role} value={role}>
@@ -303,31 +290,31 @@ export default function Register() {
                   ))}
                 </select>
                 {fieldErrors.role ? (
-                  <p className="mt-1 text-xs text-rose-400">{fieldErrors.role}</p>
+                  <p className="mt-1 text-xs text-critical-text">{fieldErrors.role}</p>
                 ) : null}
               </div>
 
-              {/* Department (Default CSE, Disabled) */}
+              {/* Department */}
               <div>
                 <label
                   htmlFor="reg-dept"
-                  className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                  className="block text-xs font-medium uppercase tracking-wider text-muted"
                 >
                   Department
                 </label>
                 <div className="relative mt-1">
-                  <Building2 className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-600" />
+                  <Building2 className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                   <input
                     id="reg-dept"
                     type="text"
                     disabled
                     value="CSE"
-                    className="h-[38px] w-full rounded-lg border border-slate-800/60 bg-slate-950/80 py-2 pl-9 pr-3 text-xs text-slate-400 cursor-not-allowed opacity-80"
+                    className="h-9 w-full rounded-[8px] border border-border-default bg-subtle py-2 pl-9 pr-3 text-xs text-muted cursor-not-allowed opacity-80"
                   />
-                  <Lock className="pointer-events-none absolute right-3 top-2.5 h-3.5 w-3.5 text-slate-600" />
+                  <Lock className="pointer-events-none absolute right-3 top-2.5 h-3.5 w-3.5 text-muted" />
                 </div>
-                <span className="mt-1 block text-[10px] text-slate-500">
-                  Fixed to CSE institutional instance
+                <span className="mt-1 block text-[10px] text-muted">
+                  Fixed to CSE instance
                 </span>
               </div>
             </div>
@@ -336,12 +323,12 @@ export default function Register() {
             <div>
               <label
                 htmlFor="reg-password"
-                className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                className="block text-xs font-medium uppercase tracking-wider text-muted"
               >
                 Password
               </label>
               <div className="relative mt-1">
-                <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                 <input
                   id="reg-password"
                   type="password"
@@ -349,15 +336,15 @@ export default function Register() {
                   onChange={handleChange('password')}
                   placeholder="•••••••• (min 6 characters)"
                   className={cn(
-                    'w-full rounded-lg border bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1',
+                    'w-full h-9 rounded-[8px] border bg-surface py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-border-focus',
                     fieldErrors.password
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
-                      : 'border-slate-800 focus:border-amber-400 focus:ring-amber-400'
+                      ? 'border-critical-border'
+                      : 'border-border-default'
                   )}
                 />
               </div>
               {fieldErrors.password ? (
-                <p className="mt-1 text-xs text-rose-400">{fieldErrors.password}</p>
+                <p className="mt-1 text-xs text-critical-text">{fieldErrors.password}</p>
               ) : null}
             </div>
 
@@ -365,12 +352,12 @@ export default function Register() {
             <div>
               <label
                 htmlFor="reg-password-confirm"
-                className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                className="block text-xs font-medium uppercase tracking-wider text-muted"
               >
                 Confirm Password
               </label>
               <div className="relative mt-1">
-                <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                 <input
                   id="reg-password-confirm"
                   type="password"
@@ -378,15 +365,15 @@ export default function Register() {
                   onChange={handleChange('password_confirmation')}
                   placeholder="••••••••"
                   className={cn(
-                    'w-full rounded-lg border bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1',
+                    'w-full h-9 rounded-[8px] border bg-surface py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-border-focus',
                     fieldErrors.password_confirmation
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
-                      : 'border-slate-800 focus:border-amber-400 focus:ring-amber-400'
+                      ? 'border-critical-border'
+                      : 'border-border-default'
                   )}
                 />
               </div>
               {fieldErrors.password_confirmation ? (
-                <p className="mt-1 text-xs text-rose-400">
+                <p className="mt-1 text-xs text-critical-text">
                   {fieldErrors.password_confirmation}
                 </p>
               ) : null}
@@ -406,11 +393,11 @@ export default function Register() {
             </Button>
 
             {/* Back to Login */}
-            <div className="pt-2 text-center text-xs text-slate-400">
+            <div className="pt-2 text-center text-xs text-muted">
               Already have an institutional account?{' '}
               <Link
                 to="/login"
-                className="font-medium text-amber-400 hover:text-amber-300 hover:underline"
+                className="font-semibold text-primary hover:underline"
               >
                 Sign in
               </Link>

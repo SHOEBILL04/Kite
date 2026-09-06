@@ -4,17 +4,17 @@ import { EmptyState } from '../components/ui/index.js';
 
 export default function NotFoundPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6">
-      <div className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-900">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-6 text-primary">
+      <div className="w-full max-w-md rounded-[8px] border border-border-default bg-surface shadow-elevation">
         <EmptyState
           icon={MapPinOff}
           title="Page not found"
           description="That route does not exist in CogniFaculty."
         />
-        <div className="border-t border-slate-800 px-4 py-3 text-center">
+        <div className="border-t border-border-default px-4 py-3 text-center">
           <Link
             to="/dashboard"
-            className="focus-ring rounded text-[13px] font-medium text-amber-400 hover:text-amber-300"
+            className="focus-ring rounded-[4px] text-[13px] font-medium text-primary hover:underline"
           >
             Back to dashboard
           </Link>

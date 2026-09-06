@@ -27,8 +27,7 @@ const DEMO_PERSONAS = [
     title: 'Exam Setter',
     description: 'CSE 2101 Lecturer & Course Coordinator',
     icon: UserCog,
-    badgeColor: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
-    iconBg: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
+    badgeVariant: 'warning',
   },
   {
     role: 'head_of_department',
@@ -36,8 +35,7 @@ const DEMO_PERSONAS = [
     title: 'Department Head',
     description: 'HoD Computer Science & Engineering',
     icon: ShieldCheck,
-    badgeColor: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
-    iconBg: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
+    badgeVariant: 'pass',
   },
   {
     role: 'moderator',
@@ -45,8 +43,7 @@ const DEMO_PERSONAS = [
     title: 'Grading Moderator',
     description: 'Academic Quality & Moderation Committee',
     icon: Scale,
-    badgeColor: 'border-sky-400/30 bg-sky-400/10 text-sky-300',
-    iconBg: 'bg-sky-400/10 text-sky-400 border-sky-400/20',
+    badgeVariant: 'info',
   },
 ];
 
@@ -144,24 +141,20 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-slate-950 text-slate-100 lg:flex-row">
+    <div className="flex min-h-screen w-full flex-col bg-canvas text-primary lg:flex-row">
       {/* ====================================================================
        * LEFT PANEL: 60% BRAND & CAPABILITY SHOWCASE
        * ==================================================================== */}
-      <div className="relative flex flex-col justify-between border-b border-slate-800/80 bg-slate-950 p-6 sm:p-10 lg:w-[60%] lg:border-b-0 lg:border-r lg:p-14">
-        {/* Ambient Top Glow */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-10 right-10 h-72 w-72 rounded-full bg-indigo-500/5 blur-3xl" />
-
+      <div className="relative flex flex-col justify-between border-b border-border-default bg-surface p-6 sm:p-10 lg:w-[60%] lg:border-b-0 lg:border-r lg:p-14">
         <div className="relative z-10">
           {/* Logo & Platform Title */}
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400 text-base font-black tracking-wider text-slate-950 shadow-lg shadow-amber-400/20">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-action-primary text-action-text text-base font-bold shadow-elevation">
               CF
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold tracking-tight text-slate-100">
+                <span className="text-xl font-bold tracking-tight text-heading">
                   CogniFaculty
                 </span>
                 {USE_MOCK ? (
@@ -174,7 +167,7 @@ export default function Login() {
                   </Badge>
                 )}
               </div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-muted">
                 Academic Integrity & Quality Audit
               </div>
             </div>
@@ -182,19 +175,19 @@ export default function Login() {
 
           {/* Hero Tagline */}
           <div className="mt-10 lg:mt-16">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-xs font-medium text-amber-300">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-subtle px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5 text-green-500" />
               Continuous Quality Audit Suite
             </div>
 
-            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-100 sm:text-4xl lg:text-5xl">
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-heading sm:text-4xl lg:text-5xl">
               Academic quality assurance,{' '}
-              <span className="bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
+              <span className="text-green-500 font-bold">
                 audited.
               </span>
             </h1>
 
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-400 sm:text-base">
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-secondary sm:text-base">
               Algorithmic verification across departmental course syllabi, draft examination defect
               screening, section-level grading bias detection, and predictive student risk modeling.
             </p>
@@ -207,17 +200,17 @@ export default function Login() {
               return (
                 <div
                   key={bullet.title}
-                  className="group rounded-xl border border-slate-800/80 bg-slate-900/60 p-4 transition-all hover:border-slate-700 hover:bg-slate-900/90"
+                  className="group rounded-[8px] border border-border-default bg-surface p-4 transition-all hover:border-border-strong"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-950 text-amber-400 group-hover:border-amber-400/40">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-border-default bg-subtle text-green-500">
                       <Icon className="h-4 w-4" strokeWidth={1.75} />
                     </span>
-                    <h3 className="text-xs font-semibold text-slate-200 group-hover:text-amber-300">
+                    <h3 className="text-xs font-semibold text-heading group-hover:text-primary">
                       {bullet.title}
                     </h3>
                   </div>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                  <p className="mt-2 text-xs leading-relaxed text-secondary">
                     {bullet.description}
                   </p>
                 </div>
@@ -227,7 +220,7 @@ export default function Login() {
         </div>
 
         {/* Left Footer Meta */}
-        <div className="relative z-10 mt-8 border-t border-slate-800/60 pt-4 text-xs text-slate-500">
+        <div className="relative z-10 mt-8 border-t border-border-default pt-4 text-xs text-muted">
           Built for Higher Education Quality Assurance Committees · AUST CSE Demonstration
         </div>
       </div>
@@ -235,12 +228,12 @@ export default function Login() {
       {/* ====================================================================
        * RIGHT PANEL: 40% SIGN IN FORM & 1-CLICK DEMO ACCESS
        * ==================================================================== */}
-      <div className="flex flex-1 flex-col justify-center p-6 sm:p-10 lg:w-[40%] lg:p-12">
+      <div className="flex flex-1 flex-col justify-center p-6 sm:p-10 lg:w-[40%] lg:p-12 bg-canvas">
         <div className="mx-auto w-full max-w-md">
           {/* Form Header */}
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-100">Sign in</h2>
-            <p className="mt-1 text-xs text-slate-400">
+            <h2 className="text-2xl font-bold tracking-tight text-heading">Sign in</h2>
+            <p className="mt-1 text-xs text-muted">
               Access your institutional dashboard and course audit evaluations.
             </p>
           </div>
@@ -249,9 +242,9 @@ export default function Login() {
           {apiError ? (
             <div
               role="alert"
-              className="mt-4 flex items-start gap-2.5 rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-300"
+              className="mt-4 flex items-start gap-2.5 rounded-[8px] border border-critical-border bg-critical-bg p-3 text-xs text-critical-text"
             >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-critical-text" />
               <div className="leading-snug">{apiError}</div>
             </div>
           ) : null}
@@ -262,12 +255,12 @@ export default function Login() {
             <div>
               <label
                 htmlFor="login-email"
-                className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                className="block text-xs font-medium uppercase tracking-wider text-muted"
               >
                 Institutional Email
               </label>
               <div className="relative mt-1.5">
-                <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                 <input
                   id="login-email"
                   type="email"
@@ -281,15 +274,15 @@ export default function Login() {
                   onKeyDown={(e) => e.key === 'Enter' && handleManualLogin()}
                   placeholder="monir@aust.edu"
                   className={cn(
-                    'w-full rounded-lg border bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1',
+                    'w-full h-9 rounded-[8px] border bg-surface py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-border-focus',
                     clientErrors.email
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
-                      : 'border-slate-800 focus:border-amber-400 focus:ring-amber-400'
+                      ? 'border-critical-border'
+                      : 'border-border-default'
                   )}
                 />
               </div>
               {clientErrors.email ? (
-                <p className="mt-1 text-xs text-rose-400">{clientErrors.email}</p>
+                <p className="mt-1 text-xs text-critical-text">{clientErrors.email}</p>
               ) : null}
             </div>
 
@@ -297,12 +290,12 @@ export default function Login() {
             <div>
               <label
                 htmlFor="login-password"
-                className="block text-xs font-medium uppercase tracking-wider text-slate-400"
+                className="block text-xs font-medium uppercase tracking-wider text-muted"
               >
                 Password
               </label>
               <div className="relative mt-1.5">
-                <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
                 <input
                   id="login-password"
                   type="password"
@@ -316,15 +309,15 @@ export default function Login() {
                   onKeyDown={(e) => e.key === 'Enter' && handleManualLogin()}
                   placeholder="••••••••"
                   className={cn(
-                    'w-full rounded-lg border bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1',
+                    'w-full h-9 rounded-[8px] border bg-surface py-2 pl-9 pr-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-border-focus',
                     clientErrors.password
-                      ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
-                      : 'border-slate-800 focus:border-amber-400 focus:ring-amber-400'
+                      ? 'border-critical-border'
+                      : 'border-border-default'
                   )}
                 />
               </div>
               {clientErrors.password ? (
-                <p className="mt-1 text-xs text-rose-400">{clientErrors.password}</p>
+                <p className="mt-1 text-xs text-critical-text">{clientErrors.password}</p>
               ) : null}
             </div>
 
@@ -342,11 +335,11 @@ export default function Login() {
             </Button>
 
             {/* Link to Register */}
-            <div className="text-center text-xs text-slate-400">
+            <div className="text-center text-xs text-muted">
               Don't have an account?{' '}
               <Link
                 to="/register"
-                className="font-medium text-amber-400 hover:text-amber-300 hover:underline"
+                className="font-semibold text-primary hover:underline"
               >
                 Create an account
               </Link>
@@ -356,13 +349,13 @@ export default function Login() {
           {/* ==================================================================
            * QUICK DEMO ACCESS BLOCK (JUDGE-FACING 1-CLICK CARDS)
            * ================================================================== */}
-          <div className="mt-8 rounded-xl border border-amber-400/30 bg-amber-400/[0.04] p-4 shadow-lg shadow-black/40">
+          <div className="mt-8 rounded-[8px] border border-border-strong bg-subtle p-4 shadow-elevation">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-400/20 text-amber-400">
+                <span className="flex h-6 w-6 items-center justify-center rounded-[4px] bg-action-primary text-action-text">
                   <Zap className="h-3.5 w-3.5 fill-current" />
                 </span>
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                <span className="text-xs font-bold uppercase tracking-wider text-heading">
                   Quick Demo Access
                 </span>
               </div>
@@ -371,7 +364,7 @@ export default function Login() {
               </Badge>
             </div>
 
-            <p className="mt-2 text-xs leading-relaxed text-slate-400">
+            <p className="mt-2 text-xs leading-relaxed text-secondary">
               Select any seeded persona to test role-specific workflows immediately without typing:
             </p>
 
@@ -394,44 +387,34 @@ export default function Login() {
                       }
                     }}
                     className={cn(
-                      'group flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/90 p-3 transition-all',
-                      'hover:border-amber-400/60 hover:bg-slate-800 hover:shadow-md hover:shadow-amber-400/5',
-                      'focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer',
+                      'group flex items-center justify-between rounded-[8px] border border-border-default bg-surface p-3 transition-all',
+                      'hover:border-border-strong hover:bg-hover',
+                      'focus-ring cursor-pointer',
                       isPending && 'opacity-60 pointer-events-none'
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className={cn(
-                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
-                          persona.iconBg
-                        )}
-                      >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border border-border-default bg-subtle text-green-500">
                         <Icon className="h-4 w-4" strokeWidth={1.75} />
                       </span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="truncate text-xs font-bold text-slate-200 group-hover:text-amber-300">
+                          <span className="truncate text-xs font-bold text-heading group-hover:text-primary">
                             {persona.name}
                           </span>
-                          <span
-                            className={cn(
-                              'inline-flex items-center rounded border px-1.5 py-0.2 text-[10px] font-medium leading-4',
-                              persona.badgeColor
-                            )}
-                          >
+                          <Badge variant={persona.badgeVariant} className="text-[10px]">
                             {persona.title}
-                          </span>
+                          </Badge>
                         </div>
-                        <p className="truncate text-[11px] text-slate-500">
+                        <p className="truncate text-[11px] text-muted">
                           {persona.description}
                         </p>
                       </div>
                     </div>
 
-                    <div className="ml-2 shrink-0 text-slate-500 group-hover:text-amber-400 transition-transform group-hover:translate-x-0.5">
+                    <div className="ml-2 shrink-0 text-muted group-hover:text-primary transition-transform group-hover:translate-x-0.5">
                       {isPending ? (
-                        <span className="text-[11px] font-medium text-amber-400">Loading…</span>
+                        <span className="text-[11px] font-medium text-primary">Loading…</span>
                       ) : (
                         <ArrowRight className="h-4 w-4" />
                       )}
@@ -441,7 +424,7 @@ export default function Login() {
               })}
             </div>
 
-            <div className="mt-3 text-center text-[10px] text-slate-500">
+            <div className="mt-3 text-center text-[10px] text-muted">
               All accounts seeded with instant Sanctum tokens in SQLite WAL DB.
             </div>
           </div>
