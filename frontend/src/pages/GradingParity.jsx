@@ -266,7 +266,7 @@ export default function GradingParity() {
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState(searchParams.get('batch') ?? '');
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
-  const autoRunTriggeredRef = useRef(false);
+  const lastRunKeyRef = useRef(null);
 
   const { user } = useAuth();
 
@@ -347,25 +347,26 @@ export default function GradingParity() {
     return () => clearInterval(timer);
   }, [auditMutation.isPending]);
 
-  // 3. Auto-run if ?autorun=1 is in the URL on mount
+  // 3. Auto-run the seeded dataset on load and when a runnable batch is selected
   const canRun =
     !selectedBatch || (selectedBatch.sections_submitted ?? 0) >= MIN_SECTIONS_FOR_PARITY;
 
   useEffect(() => {
-    if (
-      autorunParam &&
-      (selectedBatchId || selectedCourseId) &&
-      canRun &&
-      !autoRunTriggeredRef.current &&
-      !auditMutation.isPending
-    ) {
-      autoRunTriggeredRef.current = true;
+    if (!canRun || auditMutation.isPending) return;
+    const targetKey = selectedBatchId
+      ? `batch:${selectedBatchId}`
+      : (selectedCourseId ? `course:${selectedCourseId}` : null);
+
+    if (targetKey && lastRunKeyRef.current !== targetKey) {
+      lastRunKeyRef.current = targetKey;
       auditMutation.mutate({ batchId: selectedBatchId, courseId: selectedCourseId });
     }
-  }, [autorunParam, selectedBatchId, selectedCourseId, canRun, auditMutation]);
+  }, [selectedBatchId, selectedCourseId, canRun, auditMutation]);
 
   const handleRunAudit = () => {
     if (!selectedBatchId && !selectedCourseId) return;
+    const targetKey = selectedBatchId ? `batch:${selectedBatchId}` : `course:${selectedCourseId}`;
+    lastRunKeyRef.current = targetKey;
     auditMutation.mutate({ batchId: selectedBatchId, courseId: selectedCourseId });
   };
 
@@ -481,7 +482,10 @@ export default function GradingParity() {
               id="course-select"
               value={selectedCourseId}
               disabled={isCoursesLoading || isPending}
-              onChange={(e) => setSelectedCourseId(e.target.value)}
+              onChange={(e) => {
+                setSelectedCourseId(e.target.value);
+                setSelectedBatchId('');
+              }}
               className="h-9 rounded-[8px] border border-border-default bg-subtle px-3 py-1 text-xs text-primary shadow-sm focus:border-border-focus focus:outline-none disabled:opacity-50"
             >
               {isCoursesLoading ? (
