@@ -20,17 +20,17 @@
 
     /* Light University Neutrals & Surfaces */
     --surface: #FFFFFF;
-    --canvas: #F9FAF8;
-    --n-100: #F1F6F2;
-    --n-300: #E2E8F0;
+    --canvas: #F3F5F2;
+    --n-100: #EBF0EC;
+    --n-300: #D8E2DA;
     --n-500: #64748B;
     --n-700: #334155;
 
     /* Semantic Tokens */
-    --bg-canvas: #F9FAF8;
+    --bg-canvas: #F3F5F2;
     --bg-surface: #FFFFFF;
-    --bg-subtle: #F1F6F2;
-    --bg-hover: #EBF2ED;
+    --bg-subtle: #EDF2EE;
+    --bg-hover: #E3EBE5;
 
     --text-primary: #1E293B;
     --text-heading: #0B2917;
@@ -38,7 +38,7 @@
     --text-muted: #64748B;
     --text-inverse: #FFFFFF;
 
-    --border-default: #E2E8F0;
+    --border-default: #D8E2DC;
     --border-strong: #A3D1B2;
     --border-focus: #1B6338;
 
@@ -64,8 +64,9 @@
     --status-info-text: #0369A1;
 
     /* Academic Elevation & Shadows */
-    --bg-backdrop: rgba(11, 41, 23, 0.2);
-    --shadow-elevation: 0 1px 3px rgba(11, 41, 23, 0.07);
+    --bg-backdrop: rgba(11, 41, 23, 0.25);
+    --shadow-elevation: 0 1px 3px 0 rgba(11, 41, 23, 0.06), 0 1px 2px -1px rgba(11, 41, 23, 0.04);
+    --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
 
     /* Chart opacity */
     --chart-area-opacity: 0.15;
