@@ -49,6 +49,7 @@ import {
   EmptyState,
   SeverityPill,
   Skeleton,
+  StatCard,
   Table,
   TBody,
   TD,
