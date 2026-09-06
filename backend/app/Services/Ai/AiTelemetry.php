@@ -18,7 +18,6 @@ class AiTelemetry
         'fixture_fallback' => 0,
         'cache' => 1,
         'groq' => 2,
-        'gemini' => 2,
     ];
 
     private ?string $driver = null;

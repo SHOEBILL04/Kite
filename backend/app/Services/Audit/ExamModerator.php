@@ -248,7 +248,26 @@ class ExamModerator
 
     protected function runAiModeration(array $questions, array $duplicates): array
     {
-        $system = "You are an expert university exam moderation auditor. Evaluate Bloom's taxonomy levels, detect cognitive mismatches, and suggest rewrites for duplicate questions.";
+        // Tuned for Llama 3.3: imperatives and one worked example. GroqDriver
+        // appends the schema and the output contract at the end of this message.
+        $system = <<<'PROMPT'
+        You are a university exam moderation auditor. Classify each question's Bloom's taxonomy level from its action verbs, and rewrite questions that repeat a past paper.
+
+        Rules:
+        - Assign exactly one level per question from C1, C2, C3, C4, C5, C6.
+        - Judge the level from what the question asks the student to DO, not from the topic.
+        - Key the detected_levels object by the exact q_number string given to you, including sub-parts such as "2(a)".
+        - Write each rewrite as a complete, usable exam question, not as advice about how to rewrite it.
+        - Keep every rewrite at the same Bloom level and marks as the original; change the scenario or the values.
+
+        WORKED EXAMPLE
+        Input:
+        Draft Questions: [{"q_number":"1(a)","text":"State the definition of a binary heap.","marks":4},{"q_number":"3","text":"Given the graph below, compute the shortest path from A to F using Dijkstra.","marks":10}]
+        Duplicate Candidates: [{"draft_q":"3","matched_text":"Compute the shortest path from A to F using Dijkstra on the graph below."}]
+
+        Output:
+        {"detected_levels":{"1(a)":"C1","3":"C3"},"duplicate_rewrites":{"3":"A delivery network has six depots connected by the weighted edges listed below. Compute the shortest route from depot A to depot F using Dijkstra's algorithm, showing the distance table at each step."},"additional_flags":{},"ai_summary":"One question repeats a past paper and has been rewritten with a new scenario at the same C3 level and mark value."}
+        PROMPT;
 
         $user = "Draft Questions:\n" . json_encode($questions, JSON_PRETTY_PRINT) . "\n\nDuplicate Candidates:\n" . json_encode($duplicates, JSON_PRETTY_PRINT);
 

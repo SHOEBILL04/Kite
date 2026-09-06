@@ -27,6 +27,18 @@ class WarmAiCacheCommand extends Command
 
     protected $description = 'Run every audit against seeded data so the AI cache is populated with the exact prompts the API uses';
 
+    /** Spacing between live calls: 30 req/min leaves ~2s of headroom per call. */
+    private const THROTTLE_SECONDS = 2.5;
+
+    /**
+     * Throttling only matters when calls actually leave the machine; in fixture
+     * mode or with no key there is nothing to rate limit.
+     */
+    private function shouldThrottle(): bool
+    {
+        return config('services.ai.mode') === 'live' && ! empty(config('services.groq.key'));
+    }
+
     public function handle(
         GradingDriftAnalyzer $grading,
         SyllabusHarmonizer $syllabus,
@@ -59,8 +71,17 @@ class WarmAiCacheCommand extends Command
         $this->newLine();
 
         $failed = 0;
+        $first = true;
 
         foreach ($jobs as $task => $job) {
+            // Groq's free tier allows 30 requests/minute at the organization
+            // level, so warming pauses between tasks rather than racing into a
+            // 429 that would poison the cache with fixtures.
+            if (! $first && $this->shouldThrottle()) {
+                usleep((int) (self::THROTTLE_SECONDS * 1_000_000));
+            }
+            $first = false;
+
             $startedAt = microtime(true);
 
             try {

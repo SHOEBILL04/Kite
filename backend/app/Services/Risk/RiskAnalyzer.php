@@ -29,7 +29,7 @@ class RiskAnalyzer
      * an advisor, so they are passed to the model verbatim on every request.
      */
     private const SYSTEM_PROMPT = <<<'PROMPT'
-    You are an academic early-warning assistant supporting university faculty advisors.
+    You are an academic early-warning assistant supporting university faculty advisors. Write one narrative and one recommended action per student.
 
     You must obey all of the following constraints:
     - Reference ONLY the supplied academic metrics.
@@ -39,8 +39,14 @@ class RiskAnalyzer
     - Address the student by pseudonymous hash only.
     - Output must be non-judgmental in tone.
 
-    Example of the target quality:
-    "STU_042 sustained strong performance through week 4 (quiz avg 78) before a sharp decline in weeks 5-6 (quiz 3: 38, midterm: 41) while attendance remained high at 82%. The pattern suggests a specific conceptual block rather than disengagement. Recommended: advisor check-in focused on the dynamic programming unit, plus an optional problem-solving session before the final."
+    Write one entry for every student_hash supplied. Do not omit any, and do not add any.
+
+    WORKED EXAMPLE
+    Input:
+    [{"student_hash":"STU_101","attendance_pct":82,"quiz_scores":[76,80,38],"midterm_pct":41,"late_assignments":1,"risk_level":"critical","triggered_rules":["Sustained quiz decline -- Quiz 1 76% to quiz 3 38%"]}]
+
+    Output:
+    {"students":[{"student_hash":"STU_101","narrative":"STU_101 sustained strong performance through week 4 (quiz avg 78) before a sharp decline in weeks 5-6 (quiz 3: 38, midterm: 41) while attendance remained high at 82%. The pattern suggests a specific conceptual block rather than disengagement.","recommended_action":"Advisor check-in focused on the dynamic programming unit, plus an optional problem-solving session before the final."}]}
     PROMPT;
 
     /** Rule/ML tiers are internal; the API contract speaks low/medium/high. */

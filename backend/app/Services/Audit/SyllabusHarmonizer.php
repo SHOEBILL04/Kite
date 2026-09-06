@@ -352,8 +352,23 @@ class SyllabusHarmonizer
         try {
             $ai = $this->aiClient->run(
                 'syllabus',
-                'You are a university curriculum analyst. Explain the supplied curriculum findings in two sentences for a department head. '
-                    .'Reference ONLY the supplied findings and numbers. Do not invent topics, courses, or figures.',
+                // Tuned for Llama 3.3: imperatives and one worked example; the
+                // schema and output contract are appended by GroqDriver.
+                <<<'PROMPT'
+                You are a university curriculum analyst. Explain the supplied curriculum findings in exactly two sentences for a department head.
+
+                Rules:
+                - Reference ONLY the topics, courses and numbers given in the input.
+                - Do not invent topics, courses, weeks or figures.
+                - Name the courses by their codes exactly as supplied.
+
+                WORKED EXAMPLE
+                Input:
+                {"course_a":"CSE 1101","course_b":"CSE 1103","alignment_score":68,"redundant_topics":[{"topic":"Loops"}],"missing_prerequisites":[{"concept":"Pointers"}]}
+
+                Output:
+                {"ai_summary":"CSE 1101 and CSE 1103 align at 68 out of 100, with Loops taught in full in both courses. CSE 1103 also assumes Pointers, which CSE 1101 never introduces."}
+                PROMPT,
                 json_encode([
                     'course_a' => $a->code,
                     'course_b' => $b->code,
