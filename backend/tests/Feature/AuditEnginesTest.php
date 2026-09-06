@@ -504,4 +504,86 @@ class AuditEnginesTest extends TestCase
             $this->assertEquals('low', $s['risk_level']);
         }
     }
+
+    public function test_faculty_can_create_exam_batch_submit_marks_manually_and_track_obe_attainment(): void
+    {
+        $faculty = User::where('role', 'faculty')->firstOrFail();
+
+        // 1. Faculty creates a new exam / grading batch
+        $batchRes = $this->actingAs($faculty)
+            ->postJson('/api/grading-batches', [
+                'course_id' => $this->courseCSE2101->id,
+                'semester' => 'Spring 2025',
+                'assessment_name' => 'Final Exam',
+                'max_marks' => 70,
+            ]);
+
+        $batchRes->assertStatus(201)
+            ->assertJsonPath('data.course_code', 'CSE 2101')
+            ->assertJsonPath('data.assessment_name', 'Final Exam')
+            ->assertJsonPath('data.max_marks', 70);
+
+        $batchId = $batchRes->json('data.id');
+        $this->assertNotNull($batchId);
+
+        // Check Exam model was synchronized
+        $this->assertDatabaseHas('exams', [
+            'course_id' => $this->courseCSE2101->id,
+            'semester' => 'Spring 2025',
+            'exam_type' => 'Final',
+            'total_marks' => 70,
+        ]);
+
+        // 2. Faculty manually submits marks for Section A
+        $manualRows = [
+            ['student_id' => '2022831001', 'mid_marks' => 62, 'quiz_avg' => 88, 'attendance_pct' => 95],
+            ['student_id' => '2022831002', 'mid_marks' => 54, 'quiz_avg' => 76, 'attendance_pct' => 90],
+            ['student_id' => '2022831003', 'mid_marks' => 48, 'quiz_avg' => 70, 'attendance_pct' => 85],
+            ['student_id' => '2022831004', 'mid_marks' => 38, 'quiz_avg' => 60, 'attendance_pct' => 80],
+            ['student_id' => '2022831005', 'mid_marks' => 25, 'quiz_avg' => 45, 'attendance_pct' => 70],
+        ];
+
+        $submitRes = $this->actingAs($faculty)
+            ->postJson("/api/grading-batches/{$batchId}/manual-submit", [
+                'section_name' => 'Section A',
+                'rows' => $manualRows,
+            ]);
+
+        $submitRes->assertStatus(200)
+            ->assertJsonPath('data.submission.section_name', 'Section A')
+            ->assertJsonPath('data.submission.student_count', 5);
+
+        // Verify section grades saved in DB for this batch
+        $this->assertEquals(5, \App\Models\SectionGrade::where('grading_batch_id', $batchId)->count());
+
+        // 3. Test OBE Attainment calculation
+        $obeRes = $this->actingAs($faculty)
+            ->getJson("/api/grading-batches/{$batchId}/obe-attainment");
+
+        $obeRes->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'batch_id',
+                    'course_code',
+                    'assessment_name',
+                    'max_marks',
+                    'total_students',
+                    'sections_count',
+                    'overall_attainment_pct',
+                    'verdict',
+                    'clo_attainments' => [
+                        '*' => ['code', 'title', 'attained_students', 'total_students', 'attainment_rate_pct', 'status'],
+                    ],
+                    'section_breakdown' => [
+                        '*' => ['section_name', 'student_count', 'overall_attainment_pct'],
+                    ],
+                    'cqi_actions',
+                ],
+            ]);
+
+        $this->assertEquals(5, $obeRes->json('data.total_students'));
+        $this->assertNotEmpty($obeRes->json('data.clo_attainments'));
+        $this->assertNotEmpty($obeRes->json('data.cqi_actions'));
+    }
 }
+

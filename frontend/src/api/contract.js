@@ -139,6 +139,18 @@ export const ENDPOINTS = {
    */
   uploadMarks: (batchId) => `/grading-batches/${batchId}/upload`,
   /**
+   * POST — body `{ section_name: string, rows: Array<{ student_id, mid_marks, quiz_avg, attendance_pct }> }`
+   * @param {number} batchId
+   * @returns {string}
+   */
+  manualSubmitMarks: (batchId) => `/grading-batches/${batchId}/manual-submit`,
+  /**
+   * GET -> OBE Course Learning Outcome (CLO) attainment report for this batch.
+   * @param {number} batchId
+   * @returns {string}
+   */
+  obeAttainment: (batchId) => `/grading-batches/${batchId}/obe-attainment`,
+  /**
    * GET -> a CSV download with the correct headers and three example rows.
    *
    * @param {number} batchId

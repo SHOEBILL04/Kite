@@ -1242,6 +1242,106 @@ export const MOCK_MARKS_UPLOAD_ERROR = {
   total_rows: 6,
 };
 
+export const MOCK_OBE_ATTAINMENT = {
+  batch_id: 1,
+  course_code: 'CSE 2101',
+  assessment_name: 'Mid Term',
+  max_marks: 30,
+  total_students: 40,
+  sections_count: 2,
+  benchmark_threshold_pct: 50.0,
+  accreditation_target_pct: 70.0,
+  overall_attainment_pct: 82.5,
+  verdict: 'Accreditation Ready',
+  verdict_tone: 'pass',
+  clo_attainments: [
+    {
+      code: 'CLO1',
+      title: 'Foundational Data Structures & ADTs',
+      bloom_domain: 'C1-C2 (Knowledge & Comprehension)',
+      weight_pct: 25,
+      benchmark_pass_pct: 50.0,
+      attained_students: 36,
+      total_students: 40,
+      attainment_rate_pct: 90.0,
+      avg_score_pct: 84.5,
+      target_met: true,
+      status: 'achieved',
+    },
+    {
+      code: 'CLO2',
+      title: 'Complex Structures & Hierarchical Trees',
+      bloom_domain: 'C3 (Application)',
+      weight_pct: 30,
+      benchmark_pass_pct: 50.0,
+      attained_students: 33,
+      total_students: 40,
+      attainment_rate_pct: 82.5,
+      avg_score_pct: 79.2,
+      target_met: true,
+      status: 'achieved',
+    },
+    {
+      code: 'CLO3',
+      title: 'Graph Algorithms & Practical Problem Solving',
+      bloom_domain: 'C4 (Analysis)',
+      weight_pct: 25,
+      benchmark_pass_pct: 50.0,
+      attained_students: 31,
+      total_students: 40,
+      attainment_rate_pct: 77.5,
+      avg_score_pct: 73.8,
+      target_met: true,
+      status: 'achieved',
+    },
+    {
+      code: 'CLO4',
+      title: 'Algorithmic Complexity & Optimization Trade-offs',
+      bloom_domain: 'C5-C6 (Evaluation & Creation)',
+      weight_pct: 20,
+      benchmark_pass_pct: 50.0,
+      attained_students: 32,
+      total_students: 40,
+      attainment_rate_pct: 80.0,
+      avg_score_pct: 76.4,
+      target_met: true,
+      status: 'achieved',
+    },
+  ],
+  section_breakdown: [
+    {
+      section_name: 'Section A',
+      faculty_name: 'Prof. Monir',
+      student_count: 20,
+      overall_attainment_pct: 86.2,
+      status: 'Compliant',
+      clo_metrics: {
+        CLO1: { attainment_rate_pct: 95.0, avg_score_pct: 88.0, status: 'achieved' },
+        CLO2: { attainment_rate_pct: 85.0, avg_score_pct: 81.5, status: 'achieved' },
+        CLO3: { attainment_rate_pct: 80.0, avg_score_pct: 76.0, status: 'achieved' },
+        CLO4: { attainment_rate_pct: 85.0, avg_score_pct: 80.2, status: 'achieved' },
+      },
+    },
+    {
+      section_name: 'Section B',
+      faculty_name: 'Dr. Hasan',
+      student_count: 20,
+      overall_attainment_pct: 78.8,
+      status: 'Compliant',
+      clo_metrics: {
+        CLO1: { attainment_rate_pct: 85.0, avg_score_pct: 81.0, status: 'achieved' },
+        CLO2: { attainment_rate_pct: 80.0, avg_score_pct: 77.0, status: 'achieved' },
+        CLO3: { attainment_rate_pct: 75.0, avg_score_pct: 71.5, status: 'achieved' },
+        CLO4: { attainment_rate_pct: 75.0, avg_score_pct: 72.6, status: 'achieved' },
+      },
+    },
+  ],
+  cqi_actions: [
+    'All course learning outcomes meet or exceed the 70% OBE accreditation benchmark.',
+    'Slight 7.4% gap between Section A (86.2%) and Section B (78.8%) in CLO3 analysis; recommend joint tutorial problem sets.',
+  ],
+};
+
 export function resolveMock(method, url, body = {}) {
   const [path, search = ''] = url.split('?');
   const params = new URLSearchParams(search);
@@ -1251,6 +1351,34 @@ export function resolveMock(method, url, body = {}) {
   const myStats = /^\/grading-batches\/(\d+)\/my-stats$/.exec(path);
   if (myStats && method.toLowerCase() === 'get') {
     return { data: { ...MOCK_MY_SECTION_STATS, batch_id: Number(myStats[1]) } };
+  }
+
+  const obeAttainment = /^\/grading-batches\/(\d+)\/obe-attainment$/.exec(path);
+  if (obeAttainment && method.toLowerCase() === 'get') {
+    return { data: { ...MOCK_OBE_ATTAINMENT, batch_id: Number(obeAttainment[1]) } };
+  }
+
+  const manualSubmit = /^\/grading-batches\/(\d+)\/manual-submit$/.exec(path);
+  if (manualSubmit && method.toLowerCase() === 'post') {
+    const studentCount = Array.isArray(body.rows) ? body.rows.length : 5;
+    return {
+      data: {
+        submission: {
+          id: 99,
+          grading_batch_id: Number(manualSubmit[1]),
+          section_name: body.section_name ?? 'Section A',
+          faculty_id: 1,
+          faculty_name: 'Prof. Monir',
+          student_count: studentCount,
+          file_name: 'manual_entry_grid',
+          uploaded_at: new Date().toISOString(),
+        },
+        batch_status: 'ready',
+        sections_submitted: 2,
+        total_sections: 2,
+        replaced: false,
+      },
+    };
   }
 
   const uploadMarks = /^\/grading-batches\/(\d+)\/upload$/.exec(path);

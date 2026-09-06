@@ -61,11 +61,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
-    // Multi-teacher mark collection. Role rules are enforced in the
-    // controller, not by hiding buttons in the UI.
+    // Multi-teacher mark collection. Both faculty and HoD can create batches,
+    // upload marks via CSV, enter marks manually, and track OBE attainment.
     Route::get('/grading-batches', [GradingBatchController::class, 'index']);
     Route::post('/grading-batches', [GradingBatchController::class, 'store']);
     Route::post('/grading-batches/{batch}/upload', [GradingBatchController::class, 'upload']);
+    Route::post('/grading-batches/{batch}/manual-submit', [GradingBatchController::class, 'manualSubmit']);
+    Route::get('/grading-batches/{batch}/obe-attainment', [GradingBatchController::class, 'obeAttainment']);
     Route::get('/grading-batches/{batch}/template', [GradingBatchController::class, 'template']);
     Route::get('/grading-batches/{batch}/my-stats', [GradingBatchController::class, 'myStats']);
     Route::delete('/grading-batches/{batch}/submissions/{submission}', [GradingBatchController::class, 'destroySubmission']);

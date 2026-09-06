@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
+use App\Models\Exam;
 use App\Models\GradingBatch;
 use App\Models\GradingSubmission;
 use App\Models\SectionGrade;
 use App\Models\User;
 use App\Services\Grading\MarksCsvParser;
+use App\Services\Grading\ObeAttainmentCalculator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,22 +18,22 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Multi-teacher mark collection.
  *
- * Authorization is enforced here rather than in the UI: the frontend hides
- * actions a user cannot take, but every one of those rules is re-checked
- * server-side, because a hidden button is not a permission.
+ * Both faculty and heads of department can create assessment batches.
+ * Uploads and manual submissions are limited to the assigned section.
  */
 class GradingBatchController extends Controller
 {
-    public function __construct(private MarksCsvParser $parser) {}
+    public function __construct(
+        private MarksCsvParser $parser,
+        private ObeAttainmentCalculator $obeCalculator
+    ) {}
 
     // ------------------------------------------------------------------ create
 
-    /** POST /api/grading-batches — heads of department only. */
+    /** POST /api/grading-batches — opened by faculty or heads of department. */
     public function store(Request $request): JsonResponse
     {
-        if (! $this->isHod($request->user())) {
-            return $this->forbidden('Only a head of department can open a grading batch.');
-        }
+        $user = $request->user();
 
         $validated = $request->validate([
             'course_id' => ['required', 'integer', 'exists:courses,id'],
@@ -42,12 +44,23 @@ class GradingBatchController extends Controller
 
         $batch = GradingBatch::create([
             ...$validated,
-            'created_by' => $request->user()->id,
+            'created_by' => $user->id,
             'status' => GradingBatch::STATUS_COLLECTING,
         ]);
 
+        // Keep Exam record synchronized so it is available across Exam Moderation and Grading
+        $normalizedType = stripos($validated['assessment_name'], 'final') !== false ? 'Final' : 'Mid';
+        Exam::firstOrCreate([
+            'course_id' => $validated['course_id'],
+            'semester' => $validated['semester'],
+            'exam_type' => $normalizedType,
+        ], [
+            'status' => 'draft',
+            'total_marks' => $validated['max_marks'],
+        ]);
+
         return response()->json([
-            'data' => $this->presentBatch($batch->fresh(['course', 'submissions.faculty']), $request->user()),
+            'data' => $this->presentBatch($batch->fresh(['course', 'submissions.faculty']), $user),
         ], 201);
     }
 
@@ -157,6 +170,108 @@ class GradingBatchController extends Controller
                 'total_sections' => $this->totalSectionsFor($batch),
                 'replaced' => $replaced,
             ],
+        ]);
+    }
+
+    // ----------------------------------------------------------- manual submit
+
+    /** POST /api/grading-batches/{batch}/manual-submit */
+    public function manualSubmit(Request $request, GradingBatch $batch): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'section_name' => ['required', 'string', 'max:100'],
+            'rows' => ['required', 'array', 'min:1'],
+            'rows.*.student_id' => ['required', 'string', 'max:50'],
+            'rows.*.mid_marks' => ['required', 'numeric', 'min:0', "max:{$batch->max_marks}"],
+            'rows.*.quiz_avg' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'rows.*.attendance_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $sectionName = trim($validated['section_name']);
+
+        if (! $this->canUploadFor($user, $batch, $sectionName)) {
+            return $this->forbidden(
+                "You are not the assigned faculty for {$sectionName} in {$batch->course->code}."
+            );
+        }
+
+        // Check for duplicate student IDs within the submission
+        $seen = [];
+        foreach ($validated['rows'] as $i => $row) {
+            $sid = trim((string) $row['student_id']);
+            if (isset($seen[$sid])) {
+                return response()->json([
+                    'message' => "Duplicate student ID '{$sid}' found in submission (row " . ($i + 1) . ").",
+                ], 422);
+            }
+            $seen[$sid] = true;
+        }
+
+        $existing = $batch->submissions()->where('section_name', $sectionName)->first();
+        $replaced = $existing !== null;
+
+        $submission = DB::transaction(function () use ($batch, $sectionName, $user, $validated, $existing) {
+            if ($existing) {
+                SectionGrade::where('grading_submission_id', $existing->id)->delete();
+                $existing->delete();
+            }
+
+            $submission = GradingSubmission::create([
+                'grading_batch_id' => $batch->id,
+                'section_name' => $sectionName,
+                'faculty_id' => $user->id,
+                'student_count' => count($validated['rows']),
+                'uploaded_at' => now(),
+                'file_name' => 'manual_entry_grid',
+            ]);
+
+            $now = now();
+            $records = [];
+            foreach ($validated['rows'] as $row) {
+                $records[] = [
+                    'course_id' => $batch->course_id,
+                    'grading_batch_id' => $batch->id,
+                    'grading_submission_id' => $submission->id,
+                    'section_name' => $sectionName,
+                    'faculty_id' => $user->id,
+                    'student_hash' => $this->parser->hashIdentifier((string) $row['student_id']),
+                    'mid_marks' => (int) round($row['mid_marks']),
+                    'quiz_avg' => isset($row['quiz_avg']) ? (int) round($row['quiz_avg']) : 75,
+                    'attendance_pct' => isset($row['attendance_pct']) ? (int) round($row['attendance_pct']) : 85,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            SectionGrade::insert($records);
+
+            return $submission;
+        });
+
+        $batch->refresh();
+        $batch->refreshStatus();
+        $batch->refresh();
+
+        return response()->json([
+            'data' => [
+                'submission' => $this->presentSubmission($submission->load('faculty')),
+                'batch_status' => $batch->status,
+                'sections_submitted' => $batch->submissions()->count(),
+                'total_sections' => $this->totalSectionsFor($batch),
+                'replaced' => $replaced,
+            ],
+        ]);
+    }
+
+    // ---------------------------------------------------------- obe attainment
+
+    /** GET /api/grading-batches/{batch}/obe-attainment */
+    public function obeAttainment(GradingBatch $batch): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->obeCalculator->calculate($batch),
         ]);
     }
 
@@ -392,6 +507,7 @@ class GradingBatchController extends Controller
         // comparison of colleagues' marking by design, and a teacher is
         // entitled to see how their own section sits against the others.
         $payload['submissions'] = $submissions->map(fn ($s) => $this->presentSubmission($s))->values()->all();
+        $payload['obe_attainment'] = $this->obeCalculator->calculate($batch);
 
         return $payload;
     }

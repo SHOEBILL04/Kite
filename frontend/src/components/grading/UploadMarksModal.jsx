@@ -5,26 +5,21 @@ import {
   CheckCircle2,
   Download,
   FileSpreadsheet,
+  Grid,
   Loader2,
+  Plus,
   RotateCw,
+  Sparkles,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
-import { API_URL, USE_MOCK, getToken } from '../../api/client.js';
+import { API_URL, USE_MOCK, getToken, post } from '../../api/client.js';
 import { ENDPOINTS, MARKS_CSV_COLUMNS } from '../../api/contract.js';
 import { Badge, Button } from '../ui/index.js';
 
 /**
- * Upload one section's marks into a grading batch.
- *
- * The flow is deliberately three-staged — pick, preview, submit — because the
- * expensive failure here is a teacher uploading the wrong file and only finding
- * out after the server has rejected it. Parsing in the browser first turns that
- * into a two-second local check.
- *
- * The file selection survives a server rejection on purpose: the common repair
- * is to fix one cell and retry, and forcing a re-pick after every failure is
- * how a demo stalls.
+ * Upload or manually enter one section's marks into a grading batch.
  */
 
 const STAGE = {
@@ -43,10 +38,12 @@ export default function UploadMarksModal({
   open,
   onClose,
   onUploaded,
+  initialMode = 'csv',
   /** Faculty are locked to one section; HoD may pick any. */
   lockedSection = null,
   availableSections = ['Section A', 'Section B'],
 }) {
+  const [mode, setMode] = useState(initialMode); // 'csv' | 'manual'
   const [stage, setStage] = useState(STAGE.PICK);
   const [file, setFile] = useState(null);
   const [sectionName, setSectionName] = useState(lockedSection ?? availableSections[0] ?? '');
@@ -56,6 +53,18 @@ export default function UploadMarksModal({
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState(null);
   const [dragging, setDragging] = useState(false);
+
+  // Manual entry rows state
+  const defaultManualRows = useMemo(() => [
+    { student_id: '2022831001', mid_marks: Math.round((batch?.max_marks ?? 30) * 0.85), quiz_avg: 88, attendance_pct: 95 },
+    { student_id: '2022831002', mid_marks: Math.round((batch?.max_marks ?? 30) * 0.76), quiz_avg: 80, attendance_pct: 90 },
+    { student_id: '2022831003', mid_marks: Math.round((batch?.max_marks ?? 30) * 0.92), quiz_avg: 94, attendance_pct: 98 },
+    { student_id: '2022831004', mid_marks: Math.round((batch?.max_marks ?? 30) * 0.65), quiz_avg: 72, attendance_pct: 85 },
+    { student_id: '2022831005', mid_marks: Math.round((batch?.max_marks ?? 30) * 0.45), quiz_avg: 55, attendance_pct: 70 },
+  ], [batch?.max_marks]);
+
+  const [manualRows, setManualRows] = useState(defaultManualRows);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
 
   const inputRef = useRef(null);
 
@@ -122,7 +131,7 @@ export default function UploadMarksModal({
     [parseFile]
   );
 
-  // -------------------------------------------------------------- uploading
+  // -------------------------------------------------------------- CSV upload
 
   const submit = useCallback(() => {
     if (!file || !sectionName) return;
@@ -131,8 +140,6 @@ export default function UploadMarksModal({
     setProgress(0);
     setServerError(null);
 
-    // XHR rather than fetch: this is the one request in the app that needs
-    // real upload progress, and fetch cannot report it.
     const form = new FormData();
     form.append('file', file);
     form.append('section_name', sectionName);
@@ -181,8 +188,6 @@ export default function UploadMarksModal({
     xhr.send(form);
   }, [file, sectionName, batch, onUploaded]);
 
-  // In mock mode there is no server to POST a file to, so short-circuit to a
-  // success state rather than letting the request fail confusingly.
   const submitOrMock = useCallback(() => {
     if (!USE_MOCK) return submit();
 
@@ -204,8 +209,111 @@ export default function UploadMarksModal({
       setResult(mocked);
       setStage(STAGE.SUCCESS);
       onUploaded?.(mocked);
-    }, 600);
+    }, 500);
   }, [submit, sectionName, preview, file, batch, onUploaded]);
+
+  // ---------------------------------------------------------- manual submit
+
+  const handleManualRowChange = (index, field, val) => {
+    setManualRows((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: val };
+      return next;
+    });
+  };
+
+  const handleAddManualRow = () => {
+    const nextId = 2022831000 + manualRows.length + 1;
+    setManualRows((prev) => [
+      ...prev,
+      { student_id: String(nextId), mid_marks: Math.round(batch.max_marks * 0.7), quiz_avg: 75, attendance_pct: 85 },
+    ]);
+  };
+
+  const handleRemoveManualRow = (index) => {
+    if (manualRows.length <= 1) return;
+    setManualRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLoadSampleRoster = () => {
+    const sample = [
+      { student_id: '2022831001', mid_marks: Math.round(batch.max_marks * 0.90), quiz_avg: 92, attendance_pct: 96 },
+      { student_id: '2022831002', mid_marks: Math.round(batch.max_marks * 0.82), quiz_avg: 85, attendance_pct: 90 },
+      { student_id: '2022831003', mid_marks: Math.round(batch.max_marks * 0.75), quiz_avg: 78, attendance_pct: 88 },
+      { student_id: '2022831004', mid_marks: Math.round(batch.max_marks * 0.68), quiz_avg: 70, attendance_pct: 84 },
+      { student_id: '2022831005', mid_marks: Math.round(batch.max_marks * 0.88), quiz_avg: 90, attendance_pct: 94 },
+      { student_id: '2022831006', mid_marks: Math.round(batch.max_marks * 0.55), quiz_avg: 62, attendance_pct: 75 },
+      { student_id: '2022831007', mid_marks: Math.round(batch.max_marks * 0.42), quiz_avg: 50, attendance_pct: 68 },
+      { student_id: '2022831008', mid_marks: Math.round(batch.max_marks * 0.78), quiz_avg: 82, attendance_pct: 90 },
+      { student_id: '2022831009', mid_marks: Math.round(batch.max_marks * 0.84), quiz_avg: 86, attendance_pct: 92 },
+      { student_id: '2022831010', mid_marks: Math.round(batch.max_marks * 0.62), quiz_avg: 66, attendance_pct: 80 },
+    ];
+    setManualRows(sample);
+  };
+
+  const submitManual = async () => {
+    if (!manualRows.length || !sectionName) return;
+
+    // Validate marks
+    for (let i = 0; i < manualRows.length; i++) {
+      const r = manualRows[i];
+      if (!r.student_id?.trim()) {
+        setServerError({ message: `Row ${i + 1} has an empty student ID.`, row_errors: [] });
+        return;
+      }
+      const m = Number(r.mid_marks);
+      if (isNaN(m) || m < 0 || m > batch.max_marks) {
+        setServerError({ message: `Row ${i + 1} marks (${r.mid_marks}) must be between 0 and ${batch.max_marks}.`, row_errors: [] });
+        return;
+      }
+    }
+
+    setManualSubmitting(true);
+    setServerError(null);
+
+    try {
+      const payload = {
+        section_name: sectionName,
+        rows: manualRows.map((r) => ({
+          student_id: String(r.student_id).trim(),
+          mid_marks: Number(r.mid_marks),
+          quiz_avg: Number(r.quiz_avg ?? 75),
+          attendance_pct: Number(r.attendance_pct ?? 85),
+        })),
+      };
+
+      let resData = null;
+      if (USE_MOCK) {
+        resData = {
+          submission: {
+            section_name: sectionName,
+            student_count: manualRows.length,
+            file_name: 'manual_entry_grid',
+            uploaded_at: new Date().toISOString(),
+          },
+          batch_status: 'ready',
+          sections_submitted: (batch.sections_submitted ?? 0) + 1,
+          total_sections: batch.total_sections ?? 2,
+          replaced: Boolean(batch.my_submission),
+        };
+      } else {
+        const res = await post(ENDPOINTS.manualSubmitMarks(batch.id), payload);
+        resData = res?.data ?? res;
+      }
+
+      setResult(resData);
+      setStage(STAGE.SUCCESS);
+      onUploaded?.(resData);
+    } catch (err) {
+      setServerError({
+        message: err?.response?.data?.message ?? err?.message ?? 'Failed to submit marks.',
+        row_errors: [],
+      });
+      setStage(STAGE.ERROR);
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
 
   // ------------------------------------------------------ error report file
 
@@ -243,240 +351,388 @@ export default function UploadMarksModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs sm:p-8"
       role="dialog"
       aria-modal="true"
-      aria-label={`Upload marks for ${batch.assessment_name}`}
+      aria-label={`Submit marks for ${batch.assessment_name}`}
     >
-      <div className="w-full max-w-3xl rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
-        {/* Header ------------------------------------------------------- */}
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-5 py-4">
+      <div className="w-full max-w-3xl rounded-xl border border-border-default bg-surface shadow-2xl text-primary">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-border-default bg-subtle/40 px-5 py-4 rounded-t-xl">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-100">
-              Upload marks — {batch.course_code} {batch.assessment_name}
+            <h2 className="text-base font-bold text-heading">
+              Submit Marks — {batch.course_code} {batch.assessment_name}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-400">
+            <p className="mt-0.5 text-xs text-muted">
               Out of {batch.max_marks} marks · {batch.semester}
             </p>
           </div>
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-md p-1.5 text-muted transition hover:bg-subtle hover:text-primary"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-4 px-5 py-4">
-          {/* Section selector ------------------------------------------- */}
-          <div className="flex flex-wrap items-center gap-3">
-            <label htmlFor="section-select" className="text-xs font-medium text-slate-400">
-              Section:
-            </label>
-            {lockedSection ? (
-              <div className="flex items-center gap-2">
-                <Badge>{lockedSection}</Badge>
-                <span className="text-[11px] text-slate-500">
-                  You can only upload for your own section.
-                </span>
-              </div>
-            ) : (
-              <select
-                id="section-select"
-                value={sectionName}
-                onChange={(e) => setSectionName(e.target.value)}
-                disabled={stage === STAGE.UPLOADING}
-                className="h-8 rounded-lg border border-slate-700 bg-slate-950 px-3 text-xs text-slate-200 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
-              >
-                {availableSections.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <a
-              href={templateUrl}
-              className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-sky-300 transition hover:text-sky-200"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Download CSV template
-            </a>
-          </div>
-
-          {/* Stage: pick ------------------------------------------------ */}
-          {(stage === STAGE.PICK || stage === STAGE.PREVIEW) && (
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-              className={`rounded-lg border-2 border-dashed p-6 text-center transition ${
-                dragging ? 'border-amber-400 bg-amber-400/5' : 'border-slate-700 bg-slate-950/40'
+        {/* Mode Selector Tabs */}
+        {stage !== STAGE.SUCCESS && (
+          <div className="flex border-b border-border-default bg-subtle/20 px-5 pt-3">
+            <button
+              type="button"
+              onClick={() => { setMode('csv'); reset(); }}
+              className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-bold transition ${
+                mode === 'csv'
+                  ? 'border-action-primary text-action-primary'
+                  : 'border-transparent text-muted hover:text-primary'
               }`}
             >
-              <FileSpreadsheet className="mx-auto h-8 w-8 text-slate-500" />
-              <p className="mt-2 text-sm text-slate-300">
-                {file ? file.name : 'Drop a CSV here, or'}{' '}
-                {!file && (
-                  <button
-                    type="button"
-                    onClick={() => inputRef.current?.click()}
-                    className="font-medium text-amber-300 underline-offset-2 hover:underline"
-                  >
-                    browse for a file
-                  </button>
-                )}
-              </p>
-              {file ? (
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="mt-1 text-xs font-medium text-amber-300 underline-offset-2 hover:underline"
-                >
-                  Choose a different file
-                </button>
+              <FileSpreadsheet className="h-4 w-4" />
+              Upload CSV File
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('manual'); reset(); }}
+              className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-bold transition ${
+                mode === 'manual'
+                  ? 'border-action-primary text-action-primary'
+                  : 'border-transparent text-muted hover:text-primary'
+              }`}
+            >
+              <Grid className="h-4 w-4" />
+              Enter Marks Manually (Fast Grid)
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-4 px-5 py-4">
+          {/* Section selector */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <label htmlFor="section-select" className="text-xs font-semibold text-heading">
+                Target Section:
+              </label>
+              {lockedSection ? (
+                <div className="flex items-center gap-2">
+                  <Badge variant="info">{lockedSection}</Badge>
+                  <span className="text-[11px] text-muted">
+                    (Assigned to your faculty profile)
+                  </span>
+                </div>
               ) : (
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Required columns: {MARKS_CSV_COLUMNS.join(', ')}
-                </p>
+                <select
+                  id="section-select"
+                  value={sectionName}
+                  onChange={(e) => setSectionName(e.target.value)}
+                  disabled={stage === STAGE.UPLOADING || manualSubmitting}
+                  className="h-8 rounded-lg border border-border-default bg-surface px-3 text-xs font-medium text-primary focus:border-border-focus focus:outline-none focus:ring-1 focus:ring-border-focus shadow-2xs"
+                >
+                  {availableSections.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               )}
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => parseFile(e.target.files?.[0])}
-              />
             </div>
-          )}
 
-          {parseError ? (
-            <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-              {parseError}
-            </p>
-          ) : null}
+            {mode === 'csv' && (
+              <a
+                href={templateUrl}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-action-primary transition hover:underline"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download CSV template
+              </a>
+            )}
+          </div>
 
-          {/* Stage: preview --------------------------------------------- */}
-          {stage === STAGE.PREVIEW && preview ? (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-medium text-slate-300">
-                  {preview.totalRows} row{preview.totalRows === 1 ? '' : 's'} detected
-                </span>
-                {mappedColumns.map(({ column, present }) => (
-                  <span
-                    key={column}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                      present
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                        : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
-                    }`}
-                  >
-                    {column} {present ? '✓' : 'missing'}
-                  </span>
-                ))}
-              </div>
+          {/* ======================= CSV MODE ======================= */}
+          {mode === 'csv' && (
+            <>
+              {/* Pick / Drag & drop */}
+              {(stage === STAGE.PICK || stage === STAGE.PREVIEW) && (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={onDrop}
+                  className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
+                    dragging ? 'border-action-primary bg-emerald-50/50' : 'border-border-default bg-subtle/30'
+                  }`}
+                >
+                  <FileSpreadsheet className="mx-auto h-8 w-8 text-action-primary opacity-80" />
+                  <p className="mt-2 text-sm font-medium text-heading">
+                    {file ? file.name : 'Drop your section marks CSV here, or'}{' '}
+                    {!file && (
+                      <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        className="font-bold text-action-primary underline-offset-2 hover:underline"
+                      >
+                        browse file
+                      </button>
+                    )}
+                  </p>
+                  {file ? (
+                    <button
+                      type="button"
+                      onClick={() => inputRef.current?.click()}
+                      className="mt-1 text-xs font-semibold text-action-primary underline-offset-2 hover:underline"
+                    >
+                      Choose a different file
+                    </button>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-muted">
+                      Required columns: <span className="font-mono">{MARKS_CSV_COLUMNS.join(', ')}</span>
+                    </p>
+                  )}
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => parseFile(e.target.files?.[0])}
+                  />
+                </div>
+              )}
 
-              {preview.missing.length > 0 ? (
-                <p className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>
-                    This file is missing {preview.missing.join(', ')}. The server will reject it —
-                    fix the header row before uploading.
-                  </span>
-                </p>
+              {parseError ? (
+                <div className="flex items-start gap-2.5 rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 shadow-2xs">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                  <span className="font-semibold">{parseError}</span>
+                </div>
               ) : null}
 
-              <div className="overflow-x-auto rounded-lg border border-slate-800">
+              {/* Preview */}
+              {stage === STAGE.PREVIEW && preview ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-bold text-heading">
+                      {preview.totalRows} student row{preview.totalRows === 1 ? '' : 's'} parsed
+                    </span>
+                    {mappedColumns.map(({ column, present }) => (
+                      <span
+                        key={column}
+                        className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                          present
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                            : 'border-rose-300 bg-rose-50 text-rose-900'
+                        }`}
+                      >
+                        {column} {present ? '✓' : 'missing'}
+                      </span>
+                    ))}
+                  </div>
+
+                  {preview.missing.length > 0 ? (
+                    <div className="flex items-start gap-2.5 rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 shadow-2xs">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                      <span>
+                        Missing required columns: <strong>{preview.missing.join(', ')}</strong>. The server will reject this upload.
+                      </span>
+                    </div>
+                  ) : null}
+
+                  <div className="overflow-x-auto rounded-lg border border-border-default">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-subtle/70 text-heading">
+                        <tr>
+                          {preview.headers.map((h) => (
+                            <th key={h} className="whitespace-nowrap px-3 py-2 font-bold">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-default text-primary">
+                        {preview.rows.map((row, i) => (
+                          <tr key={i} className="hover:bg-subtle/30">
+                            {preview.headers.map((h) => (
+                              <td key={h} className="whitespace-nowrap px-3 py-1.5 tabular-nums">
+                                {String(row[h] ?? '')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[11px] text-muted">
+                    Showing first {preview.rows.length} of {preview.totalRows} rows.
+                  </p>
+                </div>
+              ) : null}
+            </>
+          )}
+
+          {/* ======================= MANUAL GRID MODE ======================= */}
+          {mode === 'manual' && stage !== STAGE.SUCCESS && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted">
+                  Total Students: <strong className="text-heading font-bold">{manualRows.length}</strong> ·{' '}
+                  Average Mark:{' '}
+                  <strong className="text-action-primary font-bold">
+                    {manualRows.length
+                      ? (manualRows.reduce((a, b) => a + Number(b.mid_marks || 0), 0) / manualRows.length).toFixed(1)
+                      : 0}{' '}
+                    / {batch.max_marks}
+                  </strong>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    icon={Sparkles}
+                    onClick={handleLoadSampleRoster}
+                    title="Populate 10 sample students with valid marks"
+                  >
+                    Load Sample Roster
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={Plus}
+                    onClick={handleAddManualRow}
+                  >
+                    Add Student
+                  </Button>
+                </div>
+              </div>
+
+              {/* Editable Table */}
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-border-default">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950/60 text-slate-400">
+                  <thead className="sticky top-0 bg-subtle/90 text-heading border-b border-border-default">
                     <tr>
-                      {preview.headers.map((h) => (
-                        <th key={h} className="whitespace-nowrap px-3 py-2 font-medium">
-                          {h}
-                        </th>
-                      ))}
+                      <th className="px-3 py-2 font-bold">#</th>
+                      <th className="px-3 py-2 font-bold">Student ID</th>
+                      <th className="px-3 py-2 font-bold">Marks (max: {batch.max_marks})</th>
+                      <th className="px-3 py-2 font-bold">Quiz Avg %</th>
+                      <th className="px-3 py-2 font-bold">Attendance %</th>
+                      <th className="px-3 py-2 text-right sr-only">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 text-slate-300">
-                    {preview.rows.map((row, i) => (
-                      <tr key={i}>
-                        {preview.headers.map((h) => (
-                          <td key={h} className="whitespace-nowrap px-3 py-1.5 tabular-nums">
-                            {String(row[h] ?? '')}
-                          </td>
-                        ))}
+                  <tbody className="divide-y divide-border-default text-primary">
+                    {manualRows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-subtle/20">
+                        <td className="px-3 py-1.5 text-muted tabular-nums">{idx + 1}</td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text"
+                            value={row.student_id}
+                            onChange={(e) => handleManualRowChange(idx, 'student_id', e.target.value)}
+                            placeholder="e.g. 2022831001"
+                            className="h-7 w-32 rounded border border-border-default bg-surface px-2 text-xs font-medium text-primary focus:border-border-focus focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            max={batch.max_marks}
+                            value={row.mid_marks}
+                            onChange={(e) => handleManualRowChange(idx, 'mid_marks', e.target.value)}
+                            className="h-7 w-24 rounded border border-border-default bg-surface px-2 text-xs font-bold text-heading tabular-nums focus:border-border-focus focus:outline-none"
+                          />
+                          {Number(row.mid_marks) > batch.max_marks && (
+                            <span className="ml-2 text-[10px] font-bold text-rose-600">
+                              Exceeds {batch.max_marks}!
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={row.quiz_avg}
+                            onChange={(e) => handleManualRowChange(idx, 'quiz_avg', e.target.value)}
+                            className="h-7 w-20 rounded border border-border-default bg-surface px-2 text-xs tabular-nums focus:border-border-focus focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={row.attendance_pct}
+                            onChange={(e) => handleManualRowChange(idx, 'attendance_pct', e.target.value)}
+                            className="h-7 w-20 rounded border border-border-default bg-surface px-2 text-xs tabular-nums focus:border-border-focus focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveManualRow(idx)}
+                            className="text-muted hover:text-rose-600 transition p-1"
+                            title="Remove student"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="text-[11px] text-slate-500">
-                Showing the first {preview.rows.length} of {preview.totalRows} rows.
-              </p>
             </div>
-          ) : null}
+          )}
 
-          {/* Stage: uploading ------------------------------------------- */}
-          {stage === STAGE.UPLOADING ? (
+          {/* Upload progress */}
+          {stage === STAGE.UPLOADING && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-slate-300">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
-                Uploading {file?.name}…
+              <div className="flex items-center gap-2 text-xs font-medium text-heading">
+                <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
+                Uploading marks file…
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-subtle">
                 <div
-                  className="h-full rounded-full bg-amber-400 transition-all"
+                  className="h-full rounded-full bg-action-primary transition-all"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
-          ) : null}
+          )}
 
-          {/* Stage: server rejection ------------------------------------ */}
-          {stage === STAGE.ERROR && serverError ? (
+          {/* Server rejection / Error Alert */}
+          {(stage === STAGE.ERROR || serverError) && (
             <div className="space-y-3">
-              <p className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  {serverError.message}
-                  {serverError.total_errors > (serverError.row_errors?.length ?? 0) ? (
-                    <>
-                      {' '}
+              <div className="flex items-start gap-2.5 rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 shadow-2xs">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                <div>
+                  <p className="font-bold">{serverError?.message ?? 'Submission error occurred.'}</p>
+                  {serverError?.total_errors > (serverError?.row_errors?.length ?? 0) ? (
+                    <p className="mt-1">
                       Showing {serverError.row_errors.length} of {serverError.total_errors} problems.
-                    </>
+                    </p>
                   ) : null}
-                </span>
-              </p>
+                </div>
+              </div>
 
-              {serverError.row_errors?.length ? (
+              {serverError?.row_errors?.length ? (
                 <>
-                  <div className="max-h-56 overflow-y-auto rounded-lg border border-rose-500/20">
+                  <div className="max-h-56 overflow-y-auto rounded-lg border border-rose-200 bg-white">
                     <table className="w-full text-left text-xs">
-                      <thead className="sticky top-0 bg-slate-950 text-slate-400">
+                      <thead className="sticky top-0 bg-rose-100 text-rose-950">
                         <tr>
-                          <th className="px-3 py-2 font-medium">Row</th>
-                          <th className="px-3 py-2 font-medium">Column</th>
-                          <th className="px-3 py-2 font-medium">Value</th>
-                          <th className="px-3 py-2 font-medium">Reason</th>
+                          <th className="px-3 py-2 font-bold">Row</th>
+                          <th className="px-3 py-2 font-bold">Column</th>
+                          <th className="px-3 py-2 font-bold">Value</th>
+                          <th className="px-3 py-2 font-bold">Reason</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-rose-500/10 text-slate-300">
+                      <tbody className="divide-y divide-rose-100 text-rose-900">
                         {serverError.row_errors.map((e, i) => (
                           <tr key={i}>
-                            <td className="px-3 py-1.5 tabular-nums text-slate-400">{e.row ?? '—'}</td>
-                            <td className="px-3 py-1.5 font-mono text-[11px] text-rose-300">
-                              {e.column ?? '—'}
-                            </td>
-                            <td className="px-3 py-1.5 font-mono text-[11px] text-slate-400">
-                              {String(e.value ?? '')}
-                            </td>
+                            <td className="px-3 py-1.5 tabular-nums font-bold">{e.row ?? '—'}</td>
+                            <td className="px-3 py-1.5 font-mono">{e.column ?? '—'}</td>
+                            <td className="px-3 py-1.5 font-mono">{String(e.value ?? '')}</td>
                             <td className="px-3 py-1.5">{e.reason}</td>
                           </tr>
                         ))}
@@ -489,46 +745,42 @@ export default function UploadMarksModal({
                   </Button>
                 </>
               ) : null}
-
-              <p className="text-[11px] text-slate-500">
-                Your file is still selected — fix it and press Retry, no need to pick it again.
-              </p>
             </div>
-          ) : null}
+          )}
 
-          {/* Stage: success --------------------------------------------- */}
-          {stage === STAGE.SUCCESS && result ? (
-            <div className="space-y-2">
-              <p className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  {result.submission?.student_count} students imported for{' '}
-                  {result.submission?.section_name}.
-                </span>
-              </p>
+          {/* Success Alert */}
+          {stage === STAGE.SUCCESS && result && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2.5 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900 shadow-2xs">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <div>
+                  <p className="font-bold">
+                    Successfully imported {result.submission?.student_count} students for {result.submission?.section_name}!
+                  </p>
+                  <p className="mt-0.5 text-emerald-800">
+                    {result.sections_submitted} of {result.total_sections} sections submitted · batch status is{' '}
+                    <strong>{result.batch_status}</strong>.
+                  </p>
+                </div>
+              </div>
 
               {result.replaced ? (
-                <p className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>This replaced your previous upload for this section.</span>
-                </p>
+                <div className="flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-2xs">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <span>This submission replaced your previous marks for this section.</span>
+                </div>
               ) : null}
-
-              <p className="text-xs text-slate-400">
-                {result.sections_submitted} of {result.total_sections} sections submitted · batch is{' '}
-                <span className="font-medium text-slate-200">{result.batch_status}</span>.
-              </p>
             </div>
-          ) : null}
+          )}
         </div>
 
-        {/* Footer -------------------------------------------------------- */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-5 py-3">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 border-t border-border-default bg-subtle/30 px-5 py-3 rounded-b-xl">
           <Button variant="ghost" size="sm" onClick={handleClose}>
             {stage === STAGE.SUCCESS ? 'Done' : 'Cancel'}
           </Button>
 
-          {stage === STAGE.PREVIEW ? (
+          {mode === 'csv' && stage === STAGE.PREVIEW && (
             <Button
               size="sm"
               icon={Upload}
@@ -537,13 +789,25 @@ export default function UploadMarksModal({
             >
               Confirm and upload
             </Button>
-          ) : null}
+          )}
 
-          {stage === STAGE.ERROR ? (
+          {mode === 'manual' && stage !== STAGE.SUCCESS && (
+            <Button
+              size="sm"
+              icon={Upload}
+              onClick={submitManual}
+              loading={manualSubmitting}
+              disabled={!manualRows.length || !sectionName}
+            >
+              Confirm and Submit Marks
+            </Button>
+          )}
+
+          {stage === STAGE.ERROR && mode === 'csv' && (
             <Button size="sm" icon={RotateCw} onClick={() => setStage(STAGE.PREVIEW)}>
               Retry
             </Button>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
