@@ -48,6 +48,30 @@ class SyllabusHarmonizer
         'Shortest paths' => 'dijkstra|bellman-?ford|floyd-?warshall|shortest path',
         'Network flow' => 'network flow|max(imum)? flow|ford-?fulkerson|edmonds-?karp|min-?cut',
         'NP-completeness' => 'np-?complete|3-?sat|polynomial-?time verification|reduction technique',
+
+        // Databases. The lexicon is per-discipline by design: a concept only
+        // becomes checkable once the department has named it here, and a course
+        // pair outside the listed vocabulary would otherwise score a vacuous
+        // 100 because nothing was ever looked for.
+        'Entity-relationship modelling' => 'entity[- ]relationship|\ber\b diagram|er modelling|er model|er-to-(relational|table)|weak entit|participation constraint',
+        'Relational model and keys' => 'relational model|candidate key|foreign key|referential integrity|primary key',
+        'Relational algebra' => 'relational algebra|theta join|equi-?join|natural join',
+        'SQL' => '\bsql\b|group by|subquer|common table expression',
+        'Functional dependencies' => 'functional dependenc|armstrong|attribute closure|canonical cover',
+        'Normalization' => 'normaliz|\bbcnf\b|\b[123]nf\b|lossless[- ]join|dependency-?preserving',
+        'Physical storage and buffering' => 'buffer management|page[s]? and record|physical storage|sequential vs random',
+        'Indexing' => 'b\+ ?tree|b-tree|clustered index|unclustered|hash index|indexing strategy',
+        'Query processing' => 'query processing|nested loop|sort-?merge|hash join|query plan',
+        'Transactions and concurrency control' => 'transaction|\bacid\b|isolation level|concurrency control|serializab|write skew|lost update',
+        'Recovery and logging' => 'write-?ahead log|\bwal\b|checkpoint|crash recovery|failure recovery',
+
+        // Software engineering.
+        'Software process models' => 'waterfall|scrum|kanban|\bagile\b|spiral|process model',
+        'Requirements engineering' => 'requirements engineering|use case|user stor|acceptance criteria|elicitation',
+        'Software architecture' => 'architectural design|microservice|client-?server|event-?driven|layering',
+        'Design patterns' => 'design pattern|\bsolid\b|coupling and cohesion|refactoring',
+        'Software testing' => 'unit test|integration test|regression test|boundary value|equivalence partition|test automation|test double',
+        'Release and configuration management' => 'configuration management|release engineering|continuous integration|versioning strateg',
     ];
 
     /**
@@ -65,6 +89,8 @@ class SyllabusHarmonizer
         'Heaps and heap-sort' => ['binomial heap|fibonacci heap|decrease-?key|advanced heaps', 'high'],
         'Amortized analysis' => ['potential method|accounting method|aggregate analysis|amortized', 'medium'],
         'Graph representations' => ['network flow|max(imum)? flow|shortest path', 'medium'],
+        'Transactions and concurrency control' => ['isolation level|acid guarantee|lost update|write skew|transaction boundar', 'high'],
+        'Recovery and logging' => ['write-?ahead log|\bwal\b|checkpoint|replay after', 'high'],
     ];
 
     /** Dice-coefficient floor for calling two weeks the same material. */
@@ -585,6 +611,12 @@ class SyllabusHarmonizer
             );
 
             $summary = trim((string) ($ai['ai_summary'] ?? ''));
+
+            // A fixture summary names the course pair it was frozen from, so
+            // for any other pair it is simply about two other courses.
+            if (! empty($ai[AiClient::FROM_FIXTURE])) {
+                $summary = '';
+            }
 
             // Reject an empty or placeholder answer rather than shipping it.
             if ($summary !== '' && ! str_contains(mb_strtolower($summary), 'default system fallback')) {

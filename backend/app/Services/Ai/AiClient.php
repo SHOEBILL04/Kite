@@ -23,6 +23,17 @@ use Throwable;
  */
 class AiClient
 {
+    /**
+     * Marks a payload that came from a frozen fixture rather than from a model.
+     *
+     * A fixture is one recorded report about one specific course, paper or
+     * cohort. Served for a different input it is not merely stale, it is about
+     * something else — which is how an audit of one exam ended up narrated with
+     * another exam's findings. Callers check this flag and fall back to the
+     * prose they can derive from what they actually computed.
+     */
+    public const FROM_FIXTURE = '_from_fixture';
+
     public function __construct(protected GroqDriver $groqDriver) {}
 
     public function isConfigured(): bool
@@ -79,6 +90,7 @@ class AiClient
         // 2. FIXTURE SHORT-CUT -------------------------------------------------
         if ($mode === 'fixture' || $mode === 'cache_only' || ! $hasKey) {
             $fixture = $this->loadFixture($task);
+            $fixture[self::FROM_FIXTURE] = true;
             $this->storeInCache($promptHash, $task, 'fixture', $fixture);
             $this->logRun($task, 'fixture', null, null, $this->calcLatency($startTime), true, false);
 

@@ -56,19 +56,17 @@ class GradingBatchController extends Controller
     /**
      * GET /api/grading-batches
      *
-     * A head of department sees every batch with its full submission list; a
-     * faculty member sees only batches for courses they teach, and of those
-     * only their own submission is broken out.
+     * Every signed-in faculty member sees every batch and every submission on
+     * it. Only the write actions are role-limited: opening a batch is a head of
+     * department's, and uploading is limited to the section you are assigned.
      */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
 
+        // Not scoped by course: parity is open to every faculty member, so the
+        // batch list they choose from is the whole department's.
         $query = GradingBatch::with(['course', 'submissions.faculty', 'creator'])->latest('id');
-
-        if (! $this->isHod($user)) {
-            $query->whereIn('course_id', $this->coursesTaughtBy($user));
-        }
 
         $batches = $query->get()->map(fn (GradingBatch $b) => $this->presentBatch($b, $user));
 
@@ -289,22 +287,6 @@ class GradingBatchController extends Controller
         return $user?->role === 'head_of_department';
     }
 
-    /**
-     * Courses a faculty member has marks or submissions against.
-     *
-     * @return array<int, int>
-     */
-    private function coursesTaughtBy(User $user): array
-    {
-        $fromGrades = SectionGrade::where('faculty_id', $user->id)->distinct()->pluck('course_id');
-
-        $fromSubmissions = GradingBatch::whereHas(
-            'submissions',
-            fn ($q) => $q->where('faculty_id', $user->id)
-        )->pluck('course_id');
-
-        return $fromGrades->merge($fromSubmissions)->unique()->values()->all();
-    }
 
     /**
      * A faculty member may upload only for a section they are assigned to; a
@@ -406,12 +388,10 @@ class GradingBatchController extends Controller
             'updated_at' => $batch->updated_at?->toISOString(),
         ];
 
-        // Only a head of department sees who else has uploaded. Faculty get
-        // their own submission and a count, which is what the upload workflow
-        // needs without turning into a comparison of colleagues.
-        $payload['submissions'] = $this->isHod($viewer)
-            ? $submissions->map(fn ($s) => $this->presentSubmission($s))->values()->all()
-            : [];
+        // Every faculty member sees who else has uploaded. Parity is a
+        // comparison of colleagues' marking by design, and a teacher is
+        // entitled to see how their own section sits against the others.
+        $payload['submissions'] = $submissions->map(fn ($s) => $this->presentSubmission($s))->values()->all();
 
         return $payload;
     }

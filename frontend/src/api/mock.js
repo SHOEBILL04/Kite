@@ -351,6 +351,17 @@ export const MOCK_DASHBOARD_SUMMARY = {
 
 /** @type {import('./contract.js').GradingDriftReport} */
 export const MOCK_GRADING_DRIFT = {
+  batch: {
+    id: 1,
+    course_id: 1,
+    course_code: 'CSE 2101',
+    course_title: 'Data Structures',
+    semester: 'Fall 2024',
+    assessment_name: 'Mid Term',
+    max_marks: 30,
+    status: 'audited',
+    sections_submitted: 2,
+  },
   drift_detected: true,
   severity: 'high',
   section_stats: [
@@ -787,12 +798,159 @@ export const MOCK_REPORTS = [
  * @returns {{ data: any }}
  * @throws {{ status: number, message: string, errors: Record<string, string[]>|null }}
  */
+
+/* ==========================================================================
+ * GRADING BATCHES
+ * ======================================================================= */
+
+/** Mirrors the seeded Mid Term batch: both sections in, ready to audit. */
+export const MOCK_GRADING_SUBMISSION_A = {
+  id: 1,
+  grading_batch_id: 1,
+  section_name: 'Section A',
+  faculty_id: 1,
+  faculty_name: 'Prof. Monir',
+  student_count: 20,
+  file_name: 'cse2101-section-a-midterm.csv',
+  uploaded_at: '2026-09-03T09:14:00.000000Z',
+};
+
+export const MOCK_GRADING_SUBMISSION_B = {
+  id: 2,
+  grading_batch_id: 1,
+  section_name: 'Section B',
+  faculty_id: 4,
+  faculty_name: 'Dr. Hasan',
+  student_count: 20,
+  file_name: 'cse2101-section-b-midterm.csv',
+  uploaded_at: '2026-09-04T16:02:00.000000Z',
+};
+
+/** Only Section A has uploaded — drives the "waiting for other sections" state. */
+export const MOCK_GRADING_SUBMISSION_FINAL_A = {
+  id: 3,
+  grading_batch_id: 2,
+  section_name: 'Section A',
+  faculty_id: 1,
+  faculty_name: 'Prof. Monir',
+  student_count: 20,
+  file_name: 'cse2101-section-a-final.csv',
+  uploaded_at: '2026-09-06T02:30:00.000000Z',
+};
+
+export const MOCK_GRADING_BATCHES = [
+  {
+    id: 2,
+    course_id: 1,
+    course_code: 'CSE 2101',
+    course_title: 'Data Structures',
+    semester: 'Fall 2024',
+    assessment_name: 'Final Assessment',
+    max_marks: 40,
+    status: 'collecting',
+    created_by: 2,
+    created_by_name: 'Dr. Amina',
+    sections_submitted: 1,
+    total_sections: 2,
+    my_submission: MOCK_GRADING_SUBMISSION_FINAL_A,
+    submissions: [MOCK_GRADING_SUBMISSION_FINAL_A],
+    ...TIMESTAMPS,
+  },
+  {
+    id: 1,
+    course_id: 1,
+    course_code: 'CSE 2101',
+    course_title: 'Data Structures',
+    semester: 'Fall 2024',
+    assessment_name: 'Mid Term',
+    max_marks: 30,
+    status: 'ready',
+    created_by: 2,
+    created_by_name: 'Dr. Amina',
+    sections_submitted: 2,
+    total_sections: 2,
+    my_submission: MOCK_GRADING_SUBMISSION_A,
+    submissions: [MOCK_GRADING_SUBMISSION_A, MOCK_GRADING_SUBMISSION_B],
+    ...TIMESTAMPS,
+  },
+];
+
+/** The requesting teacher's own section only — no comparative figures. */
+export const MOCK_MY_SECTION_STATS = {
+  batch_id: 1,
+  section_name: 'Section A',
+  assessment_name: 'Mid Term',
+  max_marks: 30,
+  n: 20,
+  mean: 24.3,
+  std_dev: 1.6,
+  min: 21,
+  max: 28,
+  distribution: [
+    { bucket: '0-4', count: 0 },
+    { bucket: '5-9', count: 0 },
+    { bucket: '10-14', count: 0 },
+    { bucket: '15-19', count: 0 },
+    { bucket: '20-24', count: 11 },
+    { bucket: '25-29', count: 9 },
+  ],
+  uploaded_at: '2026-09-03T09:14:00.000000Z',
+};
+
+/** A successful upload that overwrote a previous one. */
+export const MOCK_UPLOAD_MARKS_RESULT = {
+  submission: MOCK_GRADING_SUBMISSION_B,
+  batch_status: 'ready',
+  sections_submitted: 2,
+  total_sections: 2,
+  replaced: true,
+};
+
+/**
+ * The 422 body for a rejected file. Kept in the fixtures so the error table can
+ * be styled and reviewed without having to hand-craft a broken CSV.
+ */
+export const MOCK_MARKS_UPLOAD_ERROR = {
+  message: 'The file was rejected. No marks were imported.',
+  row_errors: [
+    { row: 3, column: 'mid_marks', value: 'abc', reason: 'Value is not a number.' },
+    { row: 4, column: 'mid_marks', value: 45, reason: 'Exceeds the assessment maximum of 30.' },
+    { row: 5, column: 'mid_marks', value: -3, reason: 'Marks cannot be negative.' },
+    { row: 6, column: 'attendance_pct', value: 142, reason: 'Attendance must be between 0 and 100.' },
+    {
+      row: 7,
+      column: 'student_id',
+      value: '2021831301',
+      reason: 'Duplicate student_id — already present on row 2.',
+    },
+  ],
+  total_errors: 5,
+  total_rows: 6,
+};
+
 export function resolveMock(method, url, body = {}) {
   const [path, search = ''] = url.split('?');
   const params = new URLSearchParams(search);
   const key = `${method.toLowerCase()} ${path}`;
 
   // Parameterised paths cannot be switch cases — match them first.
+  const myStats = /^\/grading-batches\/(\d+)\/my-stats$/.exec(path);
+  if (myStats && method.toLowerCase() === 'get') {
+    return { data: { ...MOCK_MY_SECTION_STATS, batch_id: Number(myStats[1]) } };
+  }
+
+  const uploadMarks = /^\/grading-batches\/(\d+)\/upload$/.exec(path);
+  if (uploadMarks && method.toLowerCase() === 'post') {
+    return { data: { ...MOCK_UPLOAD_MARKS_RESULT, replaced: false } };
+  }
+
+  const deleteSubmission = /^\/grading-batches\/(\d+)\/submissions\/(\d+)$/.exec(path);
+  if (deleteSubmission && method.toLowerCase() === 'delete') {
+    return {
+      data: { deleted: true, batch_status: 'collecting', sections_submitted: 1, total_sections: 2 },
+    };
+  }
+
   const questionsOfExam = /^\/exams\/(\d+)\/questions$/.exec(path);
   if (questionsOfExam && method.toLowerCase() === 'get') {
     const examId = Number(questionsOfExam[1]);
@@ -870,6 +1028,30 @@ export function resolveMock(method, url, body = {}) {
 
     case 'post /audit/vulnerable-students':
       return { data: MOCK_VULNERABLE_STUDENTS };
+
+    case 'get /grading-batches':
+      return { data: MOCK_GRADING_BATCHES };
+
+    case 'post /grading-batches':
+      return {
+        data: {
+          id: 99,
+          course_id: Number(body.course_id ?? 1),
+          course_code: 'CSE 2101',
+          course_title: 'Data Structures',
+          semester: body.semester ?? 'Fall 2024',
+          assessment_name: body.assessment_name ?? 'New Assessment',
+          max_marks: Number(body.max_marks ?? 30),
+          status: 'collecting',
+          created_by: 2,
+          created_by_name: 'Dr. Amina',
+          sections_submitted: 0,
+          total_sections: 2,
+          my_submission: null,
+          submissions: [],
+          ...TIMESTAMPS,
+        },
+      };
 
     case 'get /reports': {
       const moduleFilter = params.get('module');
