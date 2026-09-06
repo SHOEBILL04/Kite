@@ -42,6 +42,8 @@ Route::get('/exams', function () {
     return response()->json(['data' => $exams]);
 });
 
+Route::get('/exams/{exam}/questions', [AuditController::class, 'examQuestions']);
+
 // Dashboard & Reports
 Route::get('/dashboard/summary', [AuditController::class, 'dashboardSummary']);
 Route::get('/reports', [AuditController::class, 'reports']);

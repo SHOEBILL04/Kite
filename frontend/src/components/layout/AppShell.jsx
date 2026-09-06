@@ -13,7 +13,7 @@ import { initials } from '../../lib/format.js';
 import { ROLE_LABELS } from '../../api/contract.js';
 import { USE_MOCK } from '../../api/client.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import { Badge, Button } from '../ui/index.js';
+import { ApiStatus, Badge, Button } from '../ui/index.js';
 
 /**
  * Sidebar navigation. Feature devs: add nothing here — the five modules are
@@ -134,6 +134,7 @@ export default function AppShell() {
         </div>
 
         <div className="flex items-center gap-3">
+          <ApiStatus />
           {user ? <Badge>{ROLE_LABELS[user.role] ?? user.role}</Badge> : null}
           <UserChip user={user} />
           <Button

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditReport;
 use App\Models\Course;
 use App\Models\Exam;
+use App\Models\ExamQuestion;
 use App\Models\SectionGrade;
 use App\Models\Student;
 use App\Services\Ai\AiClient;
@@ -157,6 +158,33 @@ class AuditController extends Controller
                 'recent_reports' => $recent,
             ]
         ]);
+    }
+
+    /**
+     * GET /api/exams/{exam}/questions
+     *
+     * The paper as the faculty authored it, in q_number order. Distinct from
+     * the moderation report: no detected_bloom_level and no verdict -- these
+     * are the faculty's own values, which the editor loads before auditing.
+     * Every question row belongs to its own exam's paper, so there is no
+     * is_past_paper filter here -- that flag marks the corpus role of an exam,
+     * not whether a question is part of it.
+     */
+    public function examQuestions(int $examId): JsonResponse
+    {
+        $questions = ExamQuestion::where('exam_id', $examId)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ExamQuestion $q) => [
+                // q_number is a string in the contract ("2(a)"), not a number.
+                'q_number' => (string) $q->q_number,
+                'text' => $q->text,
+                'marks' => (float) $q->marks,
+                'assigned_bloom_level' => $q->assigned_bloom_level,
+                'assigned_clo' => $q->assigned_clo,
+            ]);
+
+        return response()->json(['data' => $questions]);
     }
 
     /**

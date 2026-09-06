@@ -1,5 +1,7 @@
+import { useCallback, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import AppShell from './components/layout/AppShell.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { Spinner } from './components/ui/index.js';
 import { useAuth } from './hooks/useAuth.js';
 
@@ -42,24 +44,94 @@ export function ProtectedRoute({ roles, children }) {
   return children;
 }
 
+/**
+ * Wraps one route in its own error boundary.
+ *
+ * Retry bumps `key`, which remounts the page subtree from scratch — clearing
+ * not just the boundary's captured error but any wedged component state that
+ * caused it. Without the remount, "Retry" would re-render the same broken tree
+ * and fail again immediately.
+ */
+function RouteBoundary({ label, children }) {
+  const [attempt, setAttempt] = useState(0);
+  const handleRetry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  return (
+    <ErrorBoundary key={attempt} label={label} onRetry={handleRetry}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route
+          path="/login"
+          element={
+            <RouteBoundary label="Sign in">
+              <LoginPage />
+            </RouteBoundary>
+          }
+        />
+      <Route
+          path="/register"
+          element={
+            <RouteBoundary label="Registration">
+              <RegisterPage />
+            </RouteBoundary>
+          }
+        />
 
       <Route
         element={
           <ProtectedRoute>
-            <AppShell />
+            <RouteBoundary label="Application shell">
+              <AppShell />
+            </RouteBoundary>
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/grading-parity" element={<GradingParityPage />} />
-        <Route path="/exam-moderation" element={<ExamModerationPage />} />
-        <Route path="/curriculum-harmonizer" element={<CurriculumHarmonizerPage />} />
-        <Route path="/student-radar" element={<StudentRadarPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <RouteBoundary label="Dashboard">
+              <DashboardPage />
+            </RouteBoundary>
+          }
+        />
+        <Route
+          path="/grading-parity"
+          element={
+            <RouteBoundary label="Grading Parity">
+              <GradingParityPage />
+            </RouteBoundary>
+          }
+        />
+        <Route
+          path="/exam-moderation"
+          element={
+            <RouteBoundary label="Exam Moderation">
+              <ExamModerationPage />
+            </RouteBoundary>
+          }
+        />
+        <Route
+          path="/curriculum-harmonizer"
+          element={
+            <RouteBoundary label="Curriculum Harmonizer">
+              <CurriculumHarmonizerPage />
+            </RouteBoundary>
+          }
+        />
+        <Route
+          path="/student-radar"
+          element={
+            <RouteBoundary label="Student Radar">
+              <StudentRadarPage />
+            </RouteBoundary>
+          }
+        />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

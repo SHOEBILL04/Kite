@@ -3,3 +3,5 @@
 !.gitignore
 !ml/
 !ml/risk_model.json
+!fixtures/
+!fixtures/*.json

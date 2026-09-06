@@ -244,6 +244,13 @@ class AiClient
         bool $fromCache = false,
         ?string $error = null
     ): void {
+        // Tell the request-scoped telemetry which path actually served the
+        // work, so the response envelope can report Live / Cached / Fixture.
+        // Failed attempts are not a serving path and are not recorded.
+        if ($ok) {
+            app(AiTelemetry::class)->record($driver, $fromCache);
+        }
+
         try {
             DB::table('ai_runs')->insert([
                 'task' => $task,

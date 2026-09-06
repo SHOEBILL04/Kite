@@ -8,143 +8,406 @@ use App\Services\Ai\AiClient;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * Curriculum harmonizer: finds re-taught topics and unmet prerequisites
+ * between a foundation course (A) and the course that builds on it (B).
+ *
+ * DETERMINISTIC DETECTION, AI EXPLANATION.
+ * -----------------------------------------------------------------------
+ * Every finding below is produced in PHP from the syllabus text and two
+ * declarative tables (a concept lexicon and a dependency table). The model is
+ * never asked *what* is wrong -- only to phrase the findings. That is what
+ * makes the audit reproducible: the same two syllabi always yield the same
+ * redundancies, the same gaps, and the same alignment score, with or without
+ * an API key.
+ */
 class SyllabusHarmonizer
 {
-    public function __construct(
-        protected AiClient $aiClient
-    ) {}
+    /**
+     * Concept lexicon: canonical topic name => regex alternatives that denote
+     * it. Matching is done on normalised (lower-cased, de-marked-up) text.
+     */
+    private const CONCEPTS = [
+        'Asymptotic complexity analysis' => 'asymptotic|big-?o|omega|theta|complexity analysis|master theorem|recurrence relation',
+        'Recursion and the call stack' => 'recursion|recursive|call stack|activation record',
+        'Divide and conquer' => 'divide[- ]and[- ]conquer|divide and conquer',
+        'Graph traversal (BFS/DFS)' => 'breadth[- ]first|depth[- ]first|\bbfs\b|\bdfs\b|graph traversal',
+        'Graph representations' => 'adjacency matrix|adjacency list',
+        'Hashing' => 'hashing|hash function|open addressing|separate chaining',
+        'Linked lists' => 'linked list',
+        'Stacks' => '\bstacks?\b',
+        'Queues' => '(?<!priority )\bqueues?\b|deque|circular buffer',
+        'Trees and traversals' => 'binary tree|tree traversal|pre-?order|in-?order|post-?order',
+        'Binary search trees' => 'binary search tree|\bbst\b',
+        'Balanced search trees' => 'avl|balance factor|rotation',
+        'Heaps and heap-sort' => '\bheaps?\b|heap-?sort|binomial heap|fibonacci heap|decrease-?key',
+        'Amortized analysis' => 'amortiz|potential method|accounting method|aggregate analysis',
+        'Sorting algorithms' => 'merge sort|quick ?sort|median of medians',
+        'Dynamic programming' => 'dynamic programming|memoization|tabulation|optimal substructure',
+        'Greedy algorithms' => 'greedy|minimum spanning tree|kruskal|prim|huffman',
+        'Shortest paths' => 'dijkstra|bellman-?ford|floyd-?warshall|shortest path',
+        'Network flow' => 'network flow|max(imum)? flow|ford-?fulkerson|edmonds-?karp|min-?cut',
+        'NP-completeness' => 'np-?complete|3-?sat|polynomial-?time verification|reduction technique',
+    ];
 
     /**
-     * Audit syllabus alignment between two sequential or related courses.
+     * Dependency table: advanced material that presupposes a foundation topic.
      *
-     * @param int $courseAId Prerequisite / Foundation course (e.g. CSE 2101)
-     * @param int $courseBId Advanced / Subsequent course (e.g. CSE 2103)
-     * @return array Matches SyllabusReport shape from contract.js
+     * Read as "if course B teaches <trigger>, it assumes the student already
+     * has <concept>; if course A never covers <concept>, that is a gap." This
+     * is the curriculum-dependency metadata a department already maintains
+     * informally -- making it explicit is what lets the check be deterministic
+     * rather than a guess.
+     *
+     * concept => [trigger regex in B, severity]
+     */
+    private const DEPENDENCIES = [
+        'Heaps and heap-sort' => ['binomial heap|fibonacci heap|decrease-?key|advanced heaps', 'high'],
+        'Amortized analysis' => ['potential method|accounting method|aggregate analysis|amortized', 'medium'],
+        'Graph representations' => ['network flow|max(imum)? flow|shortest path', 'medium'],
+    ];
+
+    /** Dice-coefficient floor for calling two weeks the same material. */
+    private const REDUNDANCY_FLOOR = 0.12;
+
+    /** Tokens too generic to carry topical meaning. */
+    private const STOPWORDS = [
+        'the', 'and', 'of', 'to', 'in', 'a', 'an', 'for', 'with', 'on', 'or', 'as',
+        'week', 'introduction', 'fundamentals', 'principles', 'overview', 'analysis',
+        'advanced', 'basic', 'review', 'topics', 'course', 'using', 'via', 'their',
+    ];
+
+    public function __construct(protected AiClient $aiClient) {}
+
+    /**
+     * @param  int  $courseAId  Foundation course (e.g. CSE 2101)
+     * @param  int  $courseBId  Advanced course (e.g. CSE 2103)
+     * @return array Matches SyllabusReport in contract.js
      */
     public function harmonise(int $courseAId, int $courseBId): array
     {
         $courseA = Course::find($courseAId);
         $courseB = Course::find($courseBId);
 
-        if (!$courseA || !$courseB) {
+        if (! $courseA || ! $courseB) {
             return $this->aiClient->loadFixture('syllabus');
         }
 
-        // 1. EXTRACT SYLLABUS TOPIC LINES
-        $syllabusA = $courseA->syllabus_markdown ?? '';
-        $syllabusB = $courseB->syllabus_markdown ?? '';
+        $weeksA = $this->parseWeeks((string) $courseA->syllabus_markdown);
+        $weeksB = $this->parseWeeks((string) $courseB->syllabus_markdown);
 
-        $linesA = $this->extractTopics($syllabusA);
-        $linesB = $this->extractTopics($syllabusB);
+        $redundantTopics = $this->findRedundancies($courseA, $weeksA, $courseB, $weeksB);
+        $missingPrerequisites = $this->findMissingPrerequisites($courseA, $weeksA, $courseB, $weeksB);
+        $bloomCoverage = $this->bloomCoverage($weeksA, $weeksB);
 
-        // 2. ONE AICLIENT CALL WITH STRICT SCHEMA
-        $system = "You are a university curriculum harmonizer assessing overlap and prerequisite alignment between Course A (Prerequisite) and Course B (Advanced). " .
-            "Identify: 1) redundant topics taught in both courses with estimated semantic similarity (0.0 - 1.0); " .
-            "2) missing prerequisites assumed by Course B that Course A never covered; " .
-            "3) combined Bloom's level topic coverage count across C1 to C6; " .
-            "4) actionable changes to harmonise both syllabi.";
+        // Alignment: each re-taught week costs 8, each unmet prerequisite 12.
+        $alignmentScore = (int) max(0, min(100,
+            100 - (count($redundantTopics) * 8) - (count($missingPrerequisites) * 12)
+        ));
 
-        $user = "Course A ({$courseA->code} - {$courseA->title}):\n" . implode("\n", $linesA) . "\n\n" .
-            "Course B ({$courseB->code} - {$courseB->title}):\n" . implode("\n", $linesB);
-
-        $schema = [
-            'type' => 'object',
-            'required' => ['redundant_topics', 'missing_prerequisites', 'bloom_coverage', 'actionable_changes', 'ai_summary'],
-            'properties' => [
-                'redundant_topics' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'required' => ['topic', 'course_a_ref', 'course_b_ref', 'similarity'],
-                        'properties' => [
-                            'topic' => ['type' => 'string'],
-                            'course_a_ref' => ['type' => 'string'],
-                            'course_b_ref' => ['type' => 'string'],
-                            'similarity' => ['type' => 'number'],
-                        ],
-                    ],
-                ],
-                'missing_prerequisites' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'required' => ['concept', 'assumed_in', 'never_introduced_in', 'severity'],
-                        'properties' => [
-                            'concept' => ['type' => 'string'],
-                            'assumed_in' => ['type' => 'string'],
-                            'never_introduced_in' => ['type' => 'string'],
-                            'severity' => ['type' => 'string', 'enum' => ['low', 'medium', 'high']],
-                        ],
-                    ],
-                ],
-                'bloom_coverage' => [
-                    'type' => 'object',
-                    'required' => ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'],
-                    'properties' => [
-                        'C1' => ['type' => 'integer'],
-                        'C2' => ['type' => 'integer'],
-                        'C3' => ['type' => 'integer'],
-                        'C4' => ['type' => 'integer'],
-                        'C5' => ['type' => 'integer'],
-                        'C6' => ['type' => 'integer'],
-                    ],
-                ],
-                'actionable_changes' => [
-                    'type' => 'array',
-                    'items' => ['type' => 'string'],
-                ],
-                'ai_summary' => ['type' => 'string'],
-            ],
-        ];
-
-        try {
-            $aiData = $this->aiClient->run('syllabus', $system, $user, $schema);
-        } catch (Throwable $e) {
-            Log::warning("SyllabusHarmonizer AI call failed: " . $e->getMessage());
-            $aiData = $this->aiClient->loadFixture('syllabus');
-        }
-
-        $redundantTopics = $aiData['redundant_topics'] ?? [];
-        $missingPrerequisites = $aiData['missing_prerequisites'] ?? [];
-
-        // 3. DETERMINISTIC PHP ALIGNMENT SCORE
-        // Formula: 100 - (redundant_count * 8) - (missing_prereq_count * 12), clamped 0-100
-        $redundantCount = count($redundantTopics);
-        $missingCount = count($missingPrerequisites);
-        $alignmentScore = max(0, min(100, 100 - ($redundantCount * 8) - ($missingCount * 12)));
+        $actionableChanges = $this->actionableChanges($courseA, $courseB, $redundantTopics, $missingPrerequisites);
 
         $report = [
             'alignment_score' => $alignmentScore,
             'redundant_topics' => $redundantTopics,
             'missing_prerequisites' => $missingPrerequisites,
-            'bloom_coverage' => $aiData['bloom_coverage'] ?? ['C1' => 4, 'C2' => 7, 'C3' => 9, 'C4' => 6, 'C5' => 2, 'C6' => 1],
-            'actionable_changes' => $aiData['actionable_changes'] ?? [],
-            'ai_summary' => $aiData['ai_summary'] ?? '',
+            'bloom_coverage' => $bloomCoverage,
+            'actionable_changes' => $actionableChanges,
+            'ai_summary' => $this->summarise(
+                $courseA, $courseB, $alignmentScore, $redundantTopics, $missingPrerequisites
+            ),
         ];
 
-        // 4. PERSIST AUDIT REPORT
         $this->persistReport($courseAId, $report);
 
         return $report;
     }
 
-    protected function extractTopics(string $markdown): array
+    /**
+     * Split a syllabus into week entries.
+     *
+     * Annotations wrapped in *( ... )* are stripped before any matching. The
+     * seed data labels its own planted anomalies that way, and an auditor that
+     * reads the answer key is not an auditor.
+     *
+     * @return array<int, array{week:int, label:string, text:string, norm:string}>
+     */
+    private function parseWeeks(string $markdown): array
     {
-        $lines = explode("\n", $markdown);
-        $topics = [];
-        foreach ($lines as $line) {
-            $trimmed = trim($line);
-            if (str_starts_with($trimmed, '- **') || str_starts_with($trimmed, '* **') || str_starts_with($trimmed, '###')) {
-                $topics[] = $trimmed;
+        $weeks = [];
+
+        foreach (explode("\n", $markdown) as $line) {
+            if (! preg_match('/^\s*[-*]\s*\*\*Week\s+(\d+)[:.]?\*\*\s*(.+)$/i', trim($line), $m)) {
+                continue;
             }
+
+            $text = $m[2];
+            $text = preg_replace('/\*\([^)]*\)\*/', '', $text);   // drop *( ... )* annotations
+            $text = preg_replace('/\$[^$]*\$/', ' ', $text);       // drop inline LaTeX
+            $text = str_replace(['**', '*', '[', ']'], ' ', $text);
+            $text = trim(preg_replace('/\s+/', ' ', $text));
+
+            $weeks[] = [
+                'week' => (int) $m[1],
+                'label' => 'Week '.$m[1],
+                'text' => $text,
+                'norm' => mb_strtolower($text),
+            ];
         }
-        return !empty($topics) ? $topics : array_filter($lines, fn($l) => strlen(trim($l)) > 5);
+
+        return $weeks;
     }
 
-    protected function persistReport(int $courseId, array $report): void
+    /**
+     * Which lexicon concepts a normalised block of text mentions.
+     *
+     * @return array<int, string> canonical concept names
+     */
+    private function conceptsIn(string $norm): array
+    {
+        $found = [];
+        foreach (self::CONCEPTS as $concept => $pattern) {
+            if (preg_match('/'.$pattern.'/i', $norm)) {
+                $found[] = $concept;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * A concept is covered by a course if any of its weeks mentions it.
+     *
+     * @param  array<int, array{norm:string}>  $weeks
+     * @return array<string, array{week:int, label:string, text:string}>  concept => first week covering it
+     */
+    private function conceptIndex(array $weeks): array
+    {
+        $index = [];
+        foreach ($weeks as $w) {
+            foreach ($this->conceptsIn($w['norm']) as $concept) {
+                $index[$concept] ??= $w;
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * Topics taught in the foundation course and taught again in the advanced one.
+     *
+     * @return array<int, array{topic:string, course_a_ref:string, course_b_ref:string, similarity:float}>
+     */
+    private function findRedundancies(Course $a, array $weeksA, Course $b, array $weeksB): array
+    {
+        $indexA = $this->conceptIndex($weeksA);
+        $indexB = $this->conceptIndex($weeksB);
+
+        // Keyed by the week of B that re-teaches the material: a week is either
+        // a re-teach or it is not, so one finding per week. Where several
+        // concepts overlap in the same week, the strongest match names it.
+        $byWeekB = [];
+
+        foreach ($weeksB as $wb) {
+            foreach ($this->conceptsIn($wb['norm']) as $concept) {
+                if (! isset($indexA[$concept])) {
+                    continue;
+                }
+
+                $wa = $indexA[$concept];
+                $similarity = $this->dice($wa['norm'], $wb['norm']);
+
+                if ($similarity < self::REDUNDANCY_FLOOR) {
+                    continue;
+                }
+
+                $existing = $byWeekB[$wb['week']] ?? null;
+                if ($existing !== null && $existing['similarity'] >= $similarity) {
+                    continue;
+                }
+
+                $byWeekB[$wb['week']] = [
+                    'topic' => $concept,
+                    'course_a_ref' => $a->code.' · '.$wa['label'],
+                    'course_b_ref' => $b->code.' · '.$wb['label'],
+                    'similarity' => round($similarity, 2),
+                ];
+            }
+        }
+
+        $redundant = array_values($byWeekB);
+
+        usort($redundant, fn ($x, $y) => $y['similarity'] <=> $x['similarity']);
+
+        return $redundant;
+    }
+
+    /**
+     * Concepts the advanced course builds on that the foundation course never
+     * introduced.
+     *
+     * @return array<int, array{concept:string, assumed_in:string, never_introduced_in:string, severity:string}>
+     */
+    private function findMissingPrerequisites(Course $a, array $weeksA, Course $b, array $weeksB): array
+    {
+        $indexA = $this->conceptIndex($weeksA);
+        $missing = [];
+
+        foreach (self::DEPENDENCIES as $concept => [$trigger, $severity]) {
+            if (isset($indexA[$concept])) {
+                continue; // Course A does teach it -- no gap.
+            }
+
+            foreach ($weeksB as $w) {
+                if (preg_match('/'.$trigger.'/i', $w['norm'])) {
+                    $missing[] = [
+                        'concept' => $concept,
+                        'assumed_in' => $b->code.' · '.$w['label'],
+                        'never_introduced_in' => $a->code,
+                        'severity' => $severity,
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * Bloom coverage across both syllabi, inferred from the verbs each week uses.
+     *
+     * @return array{C1:int,C2:int,C3:int,C4:int,C5:int,C6:int}
+     */
+    private function bloomCoverage(array $weeksA, array $weeksB): array
+    {
+        $verbs = [
+            'C1' => 'introduction|fundamental|notation|represent|review|overview|definition',
+            'C2' => 'explain|describe|principle|understand|classif|compare',
+            'C3' => 'implement|apply|conversion|convert|traversal|insertion|deletion|search|construct',
+            'C4' => 'analys|analyz|complexity|bound|trade-?off|amortiz|balance',
+            'C5' => 'optimi|evaluat|strategy|randomiz|approximation|justif',
+            'C6' => 'design|formulat|theorem|reduction|np-?complete|proof',
+        ];
+
+        $counts = ['C1' => 0, 'C2' => 0, 'C3' => 0, 'C4' => 0, 'C5' => 0, 'C6' => 0];
+
+        foreach (array_merge($weeksA, $weeksB) as $w) {
+            foreach ($verbs as $level => $pattern) {
+                if (preg_match('/'.$pattern.'/i', $w['norm'])) {
+                    $counts[$level]++;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function actionableChanges(Course $a, Course $b, array $redundant, array $missing): array
+    {
+        $changes = [];
+
+        foreach ($redundant as $r) {
+            $changes[] = sprintf(
+                'Compress "%s" in %s (%s) to a one-session refresher; it is taught in full in %s.',
+                $r['topic'],
+                $b->code,
+                $r['course_b_ref'],
+                $r['course_a_ref']
+            );
+        }
+
+        foreach ($missing as $m) {
+            $changes[] = sprintf(
+                'Introduce "%s" in %s before %s relies on it at %s.',
+                $m['concept'],
+                $a->code,
+                $b->code,
+                $m['assumed_in']
+            );
+        }
+
+        if ($changes === []) {
+            $changes[] = sprintf('No structural changes required between %s and %s.', $a->code, $b->code);
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Deterministic summary. When a model is reachable the AI layer may replace
+     * this with better prose, but the sentence is always available and always
+     * quotes the numbers the engine actually computed.
+     */
+    private function summarise(Course $a, Course $b, int $score, array $redundant, array $missing): string
+    {
+        $deterministic = sprintf(
+            'Alignment between %s and %s scores %d/100: %d topic(s) are taught in both courses and %d prerequisite concept(s) are assumed by %s but never introduced in %s.',
+            $a->code, $b->code, $score, count($redundant), count($missing), $b->code, $a->code
+        );
+
+        try {
+            $ai = $this->aiClient->run(
+                'syllabus',
+                'You are a university curriculum analyst. Explain the supplied curriculum findings in two sentences for a department head. '
+                    .'Reference ONLY the supplied findings and numbers. Do not invent topics, courses, or figures.',
+                json_encode([
+                    'course_a' => $a->code,
+                    'course_b' => $b->code,
+                    'alignment_score' => $score,
+                    'redundant_topics' => $redundant,
+                    'missing_prerequisites' => $missing,
+                ], JSON_PRETTY_PRINT),
+                [
+                    'type' => 'object',
+                    'required' => ['ai_summary'],
+                    'properties' => ['ai_summary' => ['type' => 'string']],
+                ]
+            );
+
+            $summary = trim((string) ($ai['ai_summary'] ?? ''));
+
+            // Reject an empty or placeholder answer rather than shipping it.
+            if ($summary !== '' && ! str_contains(mb_strtolower($summary), 'default system fallback')) {
+                return $summary;
+            }
+        } catch (Throwable $e) {
+            Log::warning('SyllabusHarmonizer AI summary failed: '.$e->getMessage());
+        }
+
+        return $deterministic;
+    }
+
+    /**
+     * Dice coefficient over content-word sets: 2|A∩B| / (|A|+|B|).
+     */
+    private function dice(string $x, string $y): float
+    {
+        $tokens = function (string $s): array {
+            preg_match_all('/[a-z][a-z-]{2,}/i', mb_strtolower($s), $m);
+
+            return array_values(array_unique(array_diff($m[0], self::STOPWORDS)));
+        };
+
+        $tx = $tokens($x);
+        $ty = $tokens($y);
+
+        if ($tx === [] || $ty === []) {
+            return 0.0;
+        }
+
+        return (2 * count(array_intersect($tx, $ty))) / (count($tx) + count($ty));
+    }
+
+    private function persistReport(int $courseId, array $report): void
     {
         try {
-            $severity = $report['alignment_score'] < 60 ? 'high' : ($report['alignment_score'] < 80 ? 'medium' : 'low');
+            $severity = $report['alignment_score'] < 60
+                ? 'high'
+                : ($report['alignment_score'] < 80 ? 'medium' : 'low');
 
             AuditReport::create([
                 'auditable_type' => Course::class,
@@ -154,13 +417,15 @@ class SyllabusHarmonizer
                     'alignment_score' => $report['alignment_score'],
                     'redundancies' => count($report['redundant_topics']),
                     'missing_prerequisites' => count($report['missing_prerequisites']),
+                    'redundant_topics' => $report['redundant_topics'],
+                    'missing_prerequisite_concepts' => array_column($report['missing_prerequisites'], 'concept'),
                 ],
                 'ai_summary' => $report['ai_summary'],
                 'severity' => $severity,
                 'from_cache' => false,
             ]);
         } catch (Throwable $e) {
-            Log::error("Failed to persist syllabus audit report: " . $e->getMessage());
+            Log::error('Failed to persist syllabus audit report: '.$e->getMessage());
         }
     }
 }

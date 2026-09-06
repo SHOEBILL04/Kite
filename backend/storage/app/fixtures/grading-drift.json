@@ -1,0 +1,111 @@
+{
+    "drift_detected": true,
+    "severity": "high",
+    "section_stats": [
+        {
+            "section_name": "Section A",
+            "instructor": "Prof. Monir",
+            "n": 20,
+            "mean": 24.3,
+            "std_dev": 1.6,
+            "skewness": -0.38,
+            "z_score": 0.6,
+            "leniency_index": 1.23,
+            "distribution": [
+                {
+                    "bucket": "0-5",
+                    "count": 0
+                },
+                {
+                    "bucket": "6-10",
+                    "count": 0
+                },
+                {
+                    "bucket": "11-15",
+                    "count": 0
+                },
+                {
+                    "bucket": "16-20",
+                    "count": 0
+                },
+                {
+                    "bucket": "21-25",
+                    "count": 15
+                },
+                {
+                    "bucket": "26-30",
+                    "count": 5
+                }
+            ]
+        },
+        {
+            "section_name": "Section B",
+            "instructor": "Dr. Hasan",
+            "n": 20,
+            "mean": 16.5,
+            "std_dev": 7.3,
+            "skewness": 0.38,
+            "z_score": -0.6,
+            "leniency_index": 0.79,
+            "distribution": [
+                {
+                    "bucket": "0-5",
+                    "count": 0
+                },
+                {
+                    "bucket": "6-10",
+                    "count": 5
+                },
+                {
+                    "bucket": "11-15",
+                    "count": 5
+                },
+                {
+                    "bucket": "16-20",
+                    "count": 4
+                },
+                {
+                    "bucket": "21-25",
+                    "count": 3
+                },
+                {
+                    "bucket": "26-30",
+                    "count": 3
+                }
+            ]
+        }
+    ],
+    "insights": [
+        {
+            "title": "Section mean gap between Section A and Section B",
+            "detail": "Section A averages 24.30 (leniency index 1.23) against 16.50 in Section B (leniency index 0.79) — a gap of 7.80 marks on the same assessment. Identical cohorts should not diverge this far.",
+            "severity": "high"
+        },
+        {
+            "title": "Section A sits above the cohort mean",
+            "detail": "Section A (n=20, instructor Prof. Monir) has a z-score of 0.60 against the cohort, with standard deviation 1.60 and skewness -0.38.",
+            "severity": "medium"
+        },
+        {
+            "title": "Section B sits below the cohort mean",
+            "detail": "Section B (n=20, instructor Dr. Hasan) has a z-score of -0.60 against the cohort, with standard deviation 7.30 and skewness 0.38.",
+            "severity": "medium"
+        },
+        {
+            "title": "Unequal spread between sections",
+            "detail": "The wider section varies 4.56x more than the tighter one, so the two graders are not only differing on average but on how far they spread marks.",
+            "severity": "high"
+        },
+        {
+            "title": "Proposed normalisation",
+            "detail": "A shift of +4.5 marks on Section B realigns it with the cohort mean while preserving within-section rank order.",
+            "severity": "low"
+        }
+    ],
+    "normalization": {
+        "section_name": "Section B",
+        "suggested_shift": 4.5,
+        "rationale": "Applying a +4.5 mark normalisation shift to Section B realigns the section mean with cohort expectations based on student coursework baseline, mitigating grader disparity while preserving rank order."
+    },
+    "ai_summary": "Grading drift detected: Section A averages 24.30 marks against 16.50 in Section B on the same assessment, a leniency spread of 1.23 versus 0.79. A +4.5 mark normalisation on Section B is proposed."
+}

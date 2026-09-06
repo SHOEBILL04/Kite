@@ -13,3 +13,4 @@ export { Spinner, SpinnerBlock } from './Spinner.jsx';
 export { EmptyState } from './EmptyState.jsx';
 export { Skeleton, SkeletonTable } from './Skeleton.jsx';
 export { AiSummaryCard } from './AiSummaryCard.jsx';
+export { default as ApiStatus } from './ApiStatus.jsx';

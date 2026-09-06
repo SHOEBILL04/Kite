@@ -183,7 +183,8 @@ class ExamModerator
             'questions' => $moderatedQuestions,
             'duplicates' => $duplicates,
             'cognitive_balance' => $cognitiveBalance,
-            'ai_summary' => $aiSynthesis['ai_summary'] ?? '',
+            'ai_summary' => $this->usableSummary($aiSynthesis['ai_summary'] ?? '')
+                ?: $this->deterministicSummary($markSumValid, $calculatedTotal, $declaredTotal, $moderatedQuestions, $duplicates, $cognitiveBalance),
         ];
 
         // 6. PERSIST AUDIT REPORT RECORD
@@ -273,6 +274,77 @@ class ExamModerator
                 'ai_summary' => $fixture['ai_summary'] ?? '',
             ];
         }
+    }
+
+    /**
+     * A model summary is only usable if it actually says something; the AI
+     * layer emits a placeholder when neither a driver nor a fixture is
+     * available.
+     */
+    protected function usableSummary(string $summary): string
+    {
+        $trimmed = trim($summary);
+
+        return ($trimmed === '' || str_contains(mb_strtolower($trimmed), 'default system fallback'))
+            ? ''
+            : $trimmed;
+    }
+
+    /**
+     * Summary assembled from what the moderator actually found, so the report
+     * reads correctly with no model reachable.
+     */
+    protected function deterministicSummary(
+        bool $markSumValid,
+        float $calculatedTotal,
+        float $declaredTotal,
+        array $questions,
+        array $duplicates,
+        array $balance
+    ): string {
+        $parts = [];
+
+        if (! $markSumValid) {
+            $parts[] = sprintf(
+                'the question marks sum to %s against a declared total of %s',
+                rtrim(rtrim(number_format($calculatedTotal, 1), '0'), '.'),
+                rtrim(rtrim(number_format($declaredTotal, 1), '0'), '.')
+            );
+        }
+
+        if ($duplicates !== []) {
+            $refs = implode(', ', array_map(fn ($d) => 'Q'.$d['draft_q'], $duplicates));
+            $parts[] = sprintf('%d question(s) repeat a past paper (%s)', count($duplicates), $refs);
+        }
+
+        $mismatched = array_filter(
+            $questions,
+            fn ($q) => ($q['assigned_bloom_level'] ?? null) !== ($q['detected_bloom_level'] ?? null)
+        );
+
+        if ($mismatched !== []) {
+            $parts[] = sprintf(
+                '%d question(s) are labelled at a cognitive level the wording does not support',
+                count($mismatched)
+            );
+        }
+
+        if ($parts === []) {
+            return sprintf(
+                'The paper passes moderation: marks total %s as declared, no past-paper repeats, and the cognitive split is %s%% lower-order to %s%% higher-order.',
+                rtrim(rtrim(number_format($declaredTotal, 1), '0'), '.'),
+                $balance['lower_order_pct'], $balance['higher_order_pct']
+            );
+        }
+
+        return sprintf(
+            'Moderation flagged %d issue group(s): %s. Cognitive balance is %s%% lower-order against %s%% higher-order (%s).',
+            count($parts),
+            implode('; ', $parts),
+            $balance['lower_order_pct'],
+            $balance['higher_order_pct'],
+            $balance['verdict']
+        );
     }
 
     protected function persistReport(int $examId, array $report): void
