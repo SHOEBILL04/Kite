@@ -30,6 +30,7 @@ import { get, post } from '../api/client.js';
 import { cn } from '../lib/cn.js';
 import { ratioPct } from '../lib/format.js';
 import { annotateSyllabus, scoreBand } from '../lib/syllabus.js';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard.js';
 import {
   AiSummaryCard,
   Badge,
@@ -136,29 +137,6 @@ function useMediaQuery(query) {
   }, [query]);
 
   return matches;
-}
-
-/** Copy-to-clipboard with a 1.6 s acknowledgement, keyed by row. */
-function useCopy() {
-  const [copiedKey, setCopiedKey] = useState(null);
-
-  useEffect(() => {
-    if (copiedKey === null) return undefined;
-    const timer = setTimeout(() => setCopiedKey(null), 1600);
-    return () => clearTimeout(timer);
-  }, [copiedKey]);
-
-  const copy = async (text, key) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedKey(key);
-    } catch {
-      // Clipboard permission denied (or an insecure origin) — the text stays
-      // selectable on the page, so there is nothing to recover from.
-    }
-  };
-
-  return { copiedKey, copy };
 }
 
 /* ==========================================================================
@@ -783,7 +761,7 @@ function FindingsTabs({ report, courseA, courseB }) {
 
 function ActionableChanges({ changes }) {
   const [done, setDone] = useState(() => new Set());
-  const { copiedKey, copy } = useCopy();
+  const { copiedKey, copy } = useCopyToClipboard();
 
   if (!changes?.length) {
     return null;
