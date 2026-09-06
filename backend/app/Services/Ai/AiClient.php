@@ -13,10 +13,34 @@ class AiClient
         protected GroqDriver $groqDriver
     ) {}
 
+    public function isConfigured(): bool
+    {
+        return !empty(config('services.gemini.key')) || !empty(config('services.groq.key'));
+    }
+
+    /**
+     * One structured JSON response (used by RiskAnalyzer).
+     *
+     * @param string $system
+     * @param string $prompt
+     * @param array $schema
+     * @param int $maxTokens
+     * @return array|null
+     */
+    public function structured(string $system, string $prompt, array $schema, int $maxTokens = 8000): ?array
+    {
+        try {
+            return $this->run('vulnerable-students', $system, $prompt, $schema);
+        } catch (Throwable $e) {
+            Log::warning('AiClient: structured call failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     /**
      * Run an AI inference task through the resilience pipeline:
-     * 1. Fixture mode / no-key check
-     * 2. Persistent SQLite Cache (ai_cache)
+     * 1. Persistent SQLite Cache (ai_cache)
+     * 2. Fixture mode / no-key check
      * 3. Primary Driver (Gemini with backoff)
      * 4. Fallback Driver (Groq LLaMA 3.3)
      * 5. Schema Validation & 1-shot repair
@@ -33,7 +57,7 @@ class AiClient
         $modelName = config('services.gemini.model', 'gemini-1.5-flash');
         $promptHash = hash('sha256', $task . '|' . $system . '|' . $user . '|' . $modelName);
 
-        // 2. CACHE LOOKUP (Persistent SQLite ai_cache)
+        // 1. CACHE LOOKUP (Persistent SQLite ai_cache)
         $cached = DB::table('ai_cache')->where('prompt_hash', $promptHash)->first();
         if ($cached) {
             $decoded = json_decode($cached->response_json, true);
@@ -43,7 +67,7 @@ class AiClient
             }
         }
 
-        // 1. FIXTURE MODE OR ZERO KEYS CONFIGURED
+        // 2. FIXTURE MODE OR ZERO KEYS CONFIGURED
         if ($mode === 'fixture' || (!$hasGeminiKey && !$hasGroqKey)) {
             $fixture = $this->loadFixture($task);
             $this->storeInCache($promptHash, $task, 'fixture', $fixture);
@@ -51,14 +75,13 @@ class AiClient
             return $fixture;
         }
 
-
         // 3. ATTEMPT PRIMARY DRIVER (GEMINI)
         if ($hasGeminiKey) {
             try {
                 $driverStart = microtime(true);
                 $result = $this->geminiDriver->json($system, $user, $schema);
 
-                // 6. Schema validation & repair if necessary
+                // Schema validation & repair if necessary
                 if (!$this->validateSchema($result, $schema)) {
                     $result = $this->repairAttempt($this->geminiDriver, $system, $user, $schema, $result);
                 }
@@ -169,7 +192,6 @@ class AiClient
         $path = storage_path("app/fixtures/{$task}.json");
 
         if (!file_exists($path)) {
-            // Also check relative to base path
             $altPath = base_path("storage/app/fixtures/{$task}.json");
             if (file_exists($altPath)) {
                 $path = $altPath;

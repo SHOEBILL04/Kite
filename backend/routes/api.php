@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\VulnerableStudentController;
 use App\Models\AuditReport;
 use App\Models\Course;
 use App\Models\Exam;
@@ -105,6 +106,9 @@ Route::get('/dashboard/summary', function () {
         ],
     ]);
 });
+
+// Audit Endpoints
+Route::post('/audit/vulnerable-students', VulnerableStudentController::class);
 
 Route::get('/reports', function (Request $request) {
     $query = AuditReport::query();
