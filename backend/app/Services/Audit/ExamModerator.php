@@ -131,6 +131,8 @@ class ExamModerator
             $qNum = (string) $q->q_number;
             $assignedLevel = strtoupper(trim($q->assigned_bloom_level));
             $detectedLevel = $aiSynthesis['detected_levels'][$qNum] ?? $this->inferBloomFallback($q->text);
+            $assignedClo = trim($q->assigned_clo ?? 'CLO1');
+            $facultyName = trim($q->faculty_name ?? 'Prof. Monir');
 
             $flags = $phpFlagsByQ[$qNum] ?? [];
 
@@ -165,16 +167,47 @@ class ExamModerator
                 $verdict = $hasCritical ? 'critical' : 'warning';
             }
 
+            // AI Question Strength Evaluation against past papers
+            $duplicatesForThisQ = array_values(array_filter($duplicates, fn($d) => (string)$d['draft_q'] === $qNum));
+            $strength = $this->evaluateQuestionStrength(
+                $q->text,
+                (float) $q->marks,
+                $assignedLevel,
+                $detectedLevel,
+                $flags,
+                $duplicatesForThisQ,
+                $pastQuestions
+            );
+
             $moderatedQuestions[] = [
                 'q_number' => $qNum,
                 'text' => $q->text,
                 'marks' => (float) $q->marks,
                 'assigned_bloom_level' => $assignedLevel,
                 'detected_bloom_level' => $detectedLevel,
+                'assigned_clo' => $assignedClo,
+                'faculty_name' => $facultyName,
                 'verdict' => $verdict,
                 'flags' => $flags,
+                'strength_score' => $strength['strength_score'],
+                'strength_rating' => $strength['strength_rating'],
+                'strength_metrics' => $strength['strength_metrics'],
+                'strength_feedback' => $strength['strength_feedback'],
             ];
         }
+
+        $obeCoverage = $this->auditOutcomeBasedEducation(
+            $moderatedQuestions,
+            $declaredTotal,
+            $hasC5C6,
+            $higherOrderPct,
+            $duplicates
+        );
+
+        $multiFacultySummary = $this->summarizeMultiFaculty(
+            $moderatedQuestions,
+            $calculatedTotal
+        );
 
         $finalReport = [
             'mark_sum_valid' => $markSumValid,
@@ -183,6 +216,8 @@ class ExamModerator
             'questions' => $moderatedQuestions,
             'duplicates' => $duplicates,
             'cognitive_balance' => $cognitiveBalance,
+            'obe_coverage' => $obeCoverage,
+            'multi_faculty_summary' => $multiFacultySummary,
             'ai_summary' => $this->usableSummary($aiSynthesis['ai_summary'] ?? '')
                 ?: $this->deterministicSummary($markSumValid, $calculatedTotal, $declaredTotal, $moderatedQuestions, $duplicates, $cognitiveBalance),
         ];
@@ -291,6 +326,8 @@ class ExamModerator
             $text = (string) ($q['text'] ?? '');
             $assignedLevel = strtoupper(trim($q['assigned_bloom_level'] ?? 'C1'));
             $detectedLevel = $this->inferBloomFallback($text);
+            $assignedClo = trim($q['assigned_clo'] ?? 'CLO1');
+            $facultyName = trim($q['faculty_name'] ?? 'Prof. Monir');
 
             $flags = $phpFlagsByQ[$qNum] ?? [];
 
@@ -316,16 +353,46 @@ class ExamModerator
                 $verdict = $hasCritical ? 'critical' : 'warning';
             }
 
+            $duplicatesForThisQ = array_values(array_filter($duplicates, fn($d) => (string)$d['draft_q'] === $qNum));
+            $strength = $this->evaluateQuestionStrength(
+                $text,
+                (float) ($q['marks'] ?? 0),
+                $assignedLevel,
+                $detectedLevel,
+                $flags,
+                $duplicatesForThisQ,
+                $pastQuestions
+            );
+
             $moderatedQuestions[] = [
                 'q_number' => $qNum,
                 'text' => $text,
                 'marks' => (float) ($q['marks'] ?? 0),
                 'assigned_bloom_level' => $assignedLevel,
                 'detected_bloom_level' => $detectedLevel,
+                'assigned_clo' => $assignedClo,
+                'faculty_name' => $facultyName,
                 'verdict' => $verdict,
                 'flags' => $flags,
+                'strength_score' => $strength['strength_score'],
+                'strength_rating' => $strength['strength_rating'],
+                'strength_metrics' => $strength['strength_metrics'],
+                'strength_feedback' => $strength['strength_feedback'],
             ];
         }
+
+        $obeCoverage = $this->auditOutcomeBasedEducation(
+            $moderatedQuestions,
+            $declaredTotal,
+            $hasC5C6,
+            $higherOrderPct,
+            $duplicates
+        );
+
+        $multiFacultySummary = $this->summarizeMultiFaculty(
+            $moderatedQuestions,
+            $calculatedTotal
+        );
 
         return [
             'mark_sum_valid' => $markSumValid,
@@ -334,6 +401,8 @@ class ExamModerator
             'questions' => $moderatedQuestions,
             'duplicates' => $duplicates,
             'cognitive_balance' => $cognitiveBalance,
+            'obe_coverage' => $obeCoverage,
+            'multi_faculty_summary' => $multiFacultySummary,
             'ai_summary' => $this->deterministicSummary(
                 $markSumValid,
                 $calculatedTotal,
@@ -545,5 +614,379 @@ class ExamModerator
         } catch (Throwable $e) {
             Log::error("Failed to persist exam audit report: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Evaluate AI Question Strength benchmarked against previous exam papers.
+     */
+    protected function evaluateQuestionStrength(
+        string $text,
+        float $marks,
+        string $assignedLevel,
+        string $detectedLevel,
+        array $flags,
+        array $duplicatesForThisQ,
+        $pastQuestions = []
+    ): array {
+        $score = 100;
+
+        // 1. DIMENSION: Originality & Novelty vs Previous Exams (Max 35 pts)
+        $originalityScore = 95;
+        $maxPastSim = 0.0;
+        $matchedExamRef = '';
+
+        if (!empty($duplicatesForThisQ)) {
+            $maxPastSim = max(array_column($duplicatesForThisQ, 'similarity_score'));
+            $firstDup = $duplicatesForThisQ[0];
+            $matchedExamRef = $firstDup['matched_year'] ?? 'Past Paper';
+
+            // Severe penalty for past paper leakage
+            $penalty = min(35, (int) round($maxPastSim * 35));
+            $score -= $penalty;
+            $originalityScore = max(10, (int) round((1.0 - $maxPastSim) * 100));
+        } else {
+            $textTokens = $this->tokenize($text);
+            foreach ($pastQuestions as $pastQ) {
+                $pastText = is_string($pastQ) ? $pastQ : ($pastQ->text ?? ($pastQ['text'] ?? ''));
+                if (!empty($pastText)) {
+                    $pastTokens = $this->tokenize($pastText);
+                    $sim = $this->jaccardSimilarity($textTokens, $pastTokens);
+                    if ($sim > $maxPastSim) {
+                        $maxPastSim = $sim;
+                    }
+                }
+            }
+            if ($maxPastSim > 0.35) {
+                $score -= 8;
+                $originalityScore = max(50, (int) round((1.0 - $maxPastSim) * 100));
+            }
+        }
+
+        // 2. DIMENSION: Cognitive Rigor & Action Verb Alignment (Max 30 pts)
+        $rigorScore = 85;
+        $levelNum = (int) substr($detectedLevel, 1);
+        $assignedNum = (int) substr($assignedLevel, 1);
+        $levelDelta = abs($assignedNum - $levelNum);
+
+        if (in_array($detectedLevel, ['C5', 'C6'])) {
+            $rigorScore = 95;
+        } elseif ($detectedLevel === 'C4') {
+            $rigorScore = 85;
+        } elseif ($detectedLevel === 'C3') {
+            $rigorScore = 75;
+        } else {
+            $rigorScore = 60;
+            $score -= 5;
+        }
+
+        if ($assignedNum > $levelNum) {
+            $mismatchPenalty = min(25, $levelDelta * 10);
+            $score -= $mismatchPenalty;
+            $rigorScore = max(20, $rigorScore - $mismatchPenalty);
+        }
+
+        // 3. DIMENSION: Mark Feasibility & Workload (Max 20 pts)
+        $feasibilityScore = 95;
+        $hasWorkloadDefect = false;
+        foreach ($flags as $f) {
+            if (in_array($f['type'] ?? '', ['unfeasible_marks', 'time_budget'])) {
+                $hasWorkloadDefect = true;
+                break;
+            }
+        }
+        if ($hasWorkloadDefect) {
+            $score -= 20;
+            $feasibilityScore = 35;
+        } elseif ($marks <= 0) {
+            $score -= 15;
+            $feasibilityScore = 40;
+        }
+
+        // 4. DIMENSION: Clarity & Assessment Discriminatory Depth (Max 15 pts)
+        $clarityScore = 90;
+        $stemLen = mb_strlen(trim($text));
+        if ($stemLen < 30) {
+            $score -= 10;
+            $clarityScore = 55;
+        } elseif ($stemLen > 80 && (str_contains($text, 'where') || str_contains($text, 'given') || str_contains($text, 'show') || str_contains($text, 'with'))) {
+            $clarityScore = 95;
+        }
+
+        $finalScore = max(10, min(100, $score));
+
+        if ($finalScore >= 80) {
+            $rating = 'Strong';
+        } elseif ($finalScore >= 60) {
+            $rating = 'Moderate';
+        } else {
+            $rating = 'Needs Revision';
+        }
+
+        if (!empty($duplicatesForThisQ)) {
+            $pct = round($maxPastSim * 100);
+            $feedback = "Originality risk: High textual overlap ({$pct}%) against {$matchedExamRef} question. The problem parameters and structure circulate in past student papers. Recommend changing constraints or graph topology to evaluate transfer rather than recall.";
+        } elseif ($assignedNum > $levelNum) {
+            $feedback = "Cognitive alignment defect: Tagged {$assignedLevel} but action verbs test {$detectedLevel} capability. Cognitive overstatement reduces the exam's power to assess higher-order thinking.";
+        } elseif ($hasWorkloadDefect) {
+            $feedback = "Mark allocation imbalance: Workload requires proof/analytical derivation estimated at 18-22 minutes for only {$marks} marks. Recommend increasing mark weight or decomposing into smaller subparts.";
+        } elseif (in_array($detectedLevel, ['C5', 'C6'])) {
+            $feedback = "Exemplary question strength (Score: {$finalScore}/100). Novel problem scenario not found in past exam archives. High cognitive rigor targeting {$detectedLevel} capability with robust discriminatory power.";
+        } elseif (in_array($detectedLevel, ['C3', 'C4'])) {
+            $feedback = "Solid application question (Score: {$finalScore}/100). Distinct from past paper archives with clear problem constraints and appropriate mark allocation.";
+        } else {
+            $feedback = "Acceptable foundational question (Score: {$finalScore}/100). Tests basic knowledge, but carries lower discriminatory power for separating top-tier student outcomes.";
+        }
+
+        return [
+            'strength_score' => $finalScore,
+            'strength_rating' => $rating,
+            'strength_metrics' => [
+                'originality' => $originalityScore,
+                'cognitive_rigor' => $rigorScore,
+                'mark_feasibility' => $feasibilityScore,
+                'clarity' => $clarityScore,
+            ],
+            'strength_feedback' => $feedback,
+        ];
+    }
+
+    /**
+     * Audit Outcome-Based Education (OBE) properties across the full paper.
+     */
+    protected function auditOutcomeBasedEducation(
+        array $moderatedQuestions,
+        float $declaredTotal,
+        bool $hasC5C6,
+        float $higherOrderPct,
+        array $duplicates
+    ): array {
+        $targetClos = [
+            'CLO1' => 'Foundational Knowledge & Core Principles',
+            'CLO2' => 'Algorithm Design & Data Structure Implementation',
+            'CLO3' => 'Analytical Modeling, Proof & Performance Evaluation',
+            'CLO4' => 'Synthesis, Engineering Design & Complex Problem Solving',
+        ];
+
+        $cloMarks = ['CLO1' => 0.0, 'CLO2' => 0.0, 'CLO3' => 0.0, 'CLO4' => 0.0];
+        $cloCount = ['CLO1' => 0, 'CLO2' => 0, 'CLO3' => 0, 'CLO4' => 0];
+
+        foreach ($moderatedQuestions as $q) {
+            $clo = strtoupper(trim($q['assigned_clo'] ?? 'CLO1'));
+            $m = (float) ($q['marks'] ?? 0);
+            if (!isset($cloMarks[$clo])) {
+                $cloMarks[$clo] = 0.0;
+                $cloCount[$clo] = 0;
+            }
+            $cloMarks[$clo] += $m;
+            $cloCount[$clo] += 1;
+        }
+
+        $totalMarksCounted = max(1.0, (float) array_sum($cloMarks));
+        $cloDistribution = [];
+        $missingClos = [];
+
+        foreach ($targetClos as $code => $desc) {
+            $marks = $cloMarks[$code] ?? 0.0;
+            $count = $cloCount[$code] ?? 0;
+            $pct = round(($marks / $totalMarksCounted) * 100, 1);
+
+            $cloDistribution[$code] = [
+                'clo' => $code,
+                'description' => $desc,
+                'marks' => $marks,
+                'percentage' => $pct,
+                'question_count' => $count,
+                'status' => $marks > 0 ? ($pct >= 15.0 ? 'balanced' : 'low_weight') : 'unassessed',
+            ];
+
+            if ($marks < 0.001) {
+                $missingClos[] = $code;
+            }
+        }
+
+        $allClosCovered = empty($missingClos);
+
+        $mismatchedCount = count(array_filter($moderatedQuestions, function ($q) {
+            return ($q['assigned_bloom_level'] ?? '') !== ($q['detected_bloom_level'] ?? '');
+        }));
+
+        $score = 0;
+
+        // 1. CLO Coverage: up to 30 pts
+        $coveredCount = 4 - count($missingClos);
+        $score += (int) round(($coveredCount / 4) * 30);
+
+        // 2. Cognitive Taxonomy (Bloom HOTS >= 35%): up to 30 pts
+        if ($higherOrderPct >= 35.0) {
+            $score += 30;
+        } elseif ($higherOrderPct >= 25.0) {
+            $score += 20;
+        } elseif ($higherOrderPct >= 15.0) {
+            $score += 10;
+        }
+
+        // 3. Complex Problem Solving (C5/C6 presence): up to 15 pts
+        if ($hasC5C6) {
+            $score += 15;
+        }
+
+        // 4. Constructive Alignment: up to 15 pts
+        $alignmentDeductions = min(15, $mismatchedCount * 8);
+        $score += max(0, 15 - $alignmentDeductions);
+
+        // 5. Historical Originality: up to 10 pts
+        if (empty($duplicates)) {
+            $score += 10;
+        }
+
+        $complianceScore = max(10, min(100, $score));
+
+        if ($complianceScore >= 85 && $allClosCovered && $higherOrderPct >= 35.0 && $hasC5C6) {
+            $verdict = 'OBE Compliant';
+        } elseif ($complianceScore >= 65) {
+            $verdict = 'Partially Compliant';
+        } else {
+            $verdict = 'Non-Compliant';
+        }
+
+        $checks = [
+            [
+                'id' => 'clo_coverage',
+                'label' => 'Full Course Learning Outcome (CLO) Coverage',
+                'status' => $allClosCovered ? 'pass' : 'critical',
+                'message' => $allClosCovered
+                    ? 'All 4 target CLOs (CLO1–CLO4) are actively assessed in this exam paper.'
+                    : 'Target ' . implode(', ', $missingClos) . ' has 0 marks allocated. OBE requires all course outcomes to be verified.',
+            ],
+            [
+                'id' => 'hots_threshold',
+                'label' => 'Higher-Order Thinking Skills (HOTS C4–C6 >= 35%)',
+                'status' => $higherOrderPct >= 35.0 ? 'pass' : 'warning',
+                'message' => "Higher-order cognitive outcomes represent {$higherOrderPct}% of the paper marks (Target: >= 35%).",
+            ],
+            [
+                'id' => 'complex_problem_solving',
+                'label' => 'Complex Computational Problem Solving (C5/C6 Presence)',
+                'status' => $hasC5C6 ? 'pass' : 'warning',
+                'message' => $hasC5C6
+                    ? 'Paper contains evaluation (C5) or synthesis/design (C6) tasks testing complex problem-solving capabilities.'
+                    : 'Zero questions reach C5 (Evaluate) or C6 (Create). Graduation attributes require evidence of complex design capability.',
+            ],
+            [
+                'id' => 'constructive_alignment',
+                'label' => 'Constructive Alignment & Bloom Authenticity',
+                'status' => $mismatchedCount === 0 ? 'pass' : 'warning',
+                'message' => $mismatchedCount === 0
+                    ? 'All question action verbs constructively align with their tagged Bloom taxonomy levels.'
+                    : "{$mismatchedCount} question(s) suffer from cognitive verb mismatch, inflating declared cognitive weight.",
+            ],
+            [
+                'id' => 'historical_uniqueness',
+                'label' => 'Originality & Exam Security (No Past Paper Leakage)',
+                'status' => empty($duplicates) ? 'pass' : 'critical',
+                'message' => empty($duplicates)
+                    ? 'All proposed questions are original and do not replicate past examination papers.'
+                    : count($duplicates) . ' question(s) duplicate circulating past papers, compromising assessment validity.',
+            ],
+        ];
+
+        $recommendations = [];
+        if (!empty($missingClos)) {
+            foreach ($missingClos as $mClo) {
+                $recommendations[] = "Introduce at least one question evaluating {$mClo} ({$targetClos[$mClo]}) to ensure complete learning outcome coverage.";
+            }
+        }
+        if (!$hasC5C6) {
+            $recommendations[] = 'Add an analytical critique (C5) or system design/synthesis (C6) question to fulfill complex engineering problem criteria.';
+        }
+        if ($higherOrderPct < 35.0) {
+            $recommendations[] = "Increase Higher-Order marks from {$higherOrderPct}% to at least 35% to satisfy international accreditation (BAETE / Washington Accord) thresholds.";
+        }
+        if (!empty($duplicates)) {
+            $recommendations[] = 'Rewrite flagged duplicate questions with altered parameters and topologies so circulating past papers cannot be recalled.';
+        }
+        if ($mismatchedCount > 0) {
+            $recommendations[] = 'Align question action verbs with tagged Bloom levels, or adjust tagging down to match the actual cognitive demand.';
+        }
+        if (empty($recommendations)) {
+            $recommendations[] = 'Paper meets all standard Outcome-Based Education criteria and is ready for departmental exam board certification.';
+        }
+
+        return [
+            'compliance_score' => $complianceScore,
+            'verdict' => $verdict,
+            'all_clos_covered' => $allClosCovered,
+            'missing_clos' => $missingClos,
+            'higher_order_pct' => $higherOrderPct,
+            'has_c5_c6' => $hasC5C6,
+            'clo_distribution' => $cloDistribution,
+            'checks' => $checks,
+            'recommendations' => $recommendations,
+        ];
+    }
+
+    /**
+     * Summarize questions authored by multiple faculty members.
+     */
+    protected function summarizeMultiFaculty(array $moderatedQuestions, float $totalMarks): array
+    {
+        $facultyGroups = [];
+
+        foreach ($moderatedQuestions as $q) {
+            $faculty = trim($q['faculty_name'] ?? '');
+            if ($faculty === '') {
+                $faculty = 'Faculty Contributor';
+            }
+
+            if (!isset($facultyGroups[$faculty])) {
+                $facultyGroups[$faculty] = [
+                    'faculty_name' => $faculty,
+                    'question_numbers' => [],
+                    'question_count' => 0,
+                    'total_marks' => 0.0,
+                    'strength_scores' => [],
+                    'clos_covered' => [],
+                    'bloom_distribution' => [],
+                ];
+            }
+
+            $facultyGroups[$faculty]['question_numbers'][] = $q['q_number'];
+            $facultyGroups[$faculty]['question_count'] += 1;
+            $facultyGroups[$faculty]['total_marks'] += (float) ($q['marks'] ?? 0);
+            if (isset($q['strength_score'])) {
+                $facultyGroups[$faculty]['strength_scores'][] = (int) $q['strength_score'];
+            }
+            if (!empty($q['assigned_clo'])) {
+                $facultyGroups[$faculty]['clos_covered'][] = $q['assigned_clo'];
+            }
+            $bloom = $q['assigned_bloom_level'] ?? 'C1';
+            $facultyGroups[$faculty]['bloom_distribution'][$bloom] =
+                ($facultyGroups[$faculty]['bloom_distribution'][$bloom] ?? 0) + 1;
+        }
+
+        $totalMarksCounted = max(1.0, $totalMarks);
+        $breakdown = [];
+
+        foreach ($facultyGroups as $faculty => $data) {
+            $avgStrength = !empty($data['strength_scores'])
+                ? round(array_sum($data['strength_scores']) / count($data['strength_scores']), 1)
+                : 75.0;
+
+            $breakdown[] = [
+                'faculty_name' => $faculty,
+                'question_numbers' => $data['question_numbers'],
+                'question_count' => $data['question_count'],
+                'total_marks' => $data['total_marks'],
+                'marks_share_pct' => round(($data['total_marks'] / $totalMarksCounted) * 100, 1),
+                'avg_strength_score' => $avgStrength,
+                'clos_covered' => array_values(array_unique($data['clos_covered'])),
+                'bloom_distribution' => $data['bloom_distribution'],
+            ];
+        }
+
+        return [
+            'faculty_count' => count($breakdown),
+            'faculty_breakdown' => $breakdown,
+        ];
     }
 }

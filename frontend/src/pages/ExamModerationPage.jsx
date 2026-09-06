@@ -2,24 +2,33 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  Award,
   BadgeCheck,
+  BookOpen,
   Braces,
   Check,
+  CheckCircle2,
   ChevronDown,
   Clock,
   Copy,
   Download,
   Files,
   FileSearch,
+  GraduationCap,
   ListTree,
   Play,
   Plus,
   Scale,
+  ShieldAlert,
   Sigma,
+  Sparkles,
   Tag,
+  Target,
   Trash2,
   TrendingUp,
   Upload,
+  UserCheck,
+  Users,
   X,
 } from 'lucide-react';
 import { PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer } from 'recharts';
@@ -45,6 +54,7 @@ import {
  * ======================================================================= */
 
 const DEFAULT_CLOS = ['CLO1', 'CLO2', 'CLO3', 'CLO4'];
+const FACULTY_OPTIONS = ['Prof. Monir', 'Dr. Hasan', 'Dr. Amina', 'Dr. Nusrat'];
 
 const BLOOM_LABELS = {
   C1: 'C1 Remember',
@@ -92,6 +102,54 @@ const VERDICT_TONES = {
   },
 };
 
+const STRENGTH_TONES = {
+  Strong: {
+    badge: 'pass',
+    label: 'Strong',
+    border: 'border-pass-border',
+    bg: 'bg-pass-fill',
+    text: 'text-pass-text',
+    ring: 'var(--pass-border)',
+  },
+  Moderate: {
+    badge: 'warning',
+    label: 'Moderate',
+    border: 'border-warning-border',
+    bg: 'bg-warning-fill',
+    text: 'text-warning-text',
+    ring: 'var(--warning-border)',
+  },
+  'Needs Revision': {
+    badge: 'critical',
+    label: 'Needs Revision',
+    border: 'border-critical-border',
+    bg: 'bg-critical-fill',
+    text: 'text-critical-text',
+    ring: 'var(--critical-border)',
+  },
+};
+
+const OBE_VERDICT_TONES = {
+  'OBE Compliant': {
+    badge: 'pass',
+    text: 'text-pass-text',
+    bg: 'bg-pass-fill',
+    border: 'border-pass-border',
+  },
+  'Partially Compliant': {
+    badge: 'warning',
+    text: 'text-warning-text',
+    bg: 'bg-warning-fill',
+    border: 'border-warning-border',
+  },
+  'Non-Compliant': {
+    badge: 'critical',
+    text: 'text-critical-text',
+    bg: 'bg-critical-fill',
+    border: 'border-critical-border',
+  },
+};
+
 const FLAG_ICONS = {
   verb_mismatch: Tag,
   clo_inflation: TrendingUp,
@@ -101,11 +159,11 @@ const FLAG_ICONS = {
 };
 
 const AUDIT_STAGES = [
-  'Parsing question stems…',
-  'Classifying Bloom verbs against the tagged levels…',
-  'Matching the draft against past papers…',
-  'Checking mark feasibility and time budget…',
-  'Composing the moderation summary…',
+  'Parsing multi-faculty question stems…',
+  'Benchmarking question strength against past exam archives…',
+  'Auditing Outcome-Based Education (OBE) properties and CLO coverage…',
+  'Evaluating Bloom verbs, mark feasibility and time budget…',
+  'Synthesizing departmental moderation & accreditation report…',
 ];
 
 const EMPTY_QUESTION = {
@@ -114,6 +172,7 @@ const EMPTY_QUESTION = {
   marks: 0,
   assigned_bloom_level: 'C1',
   assigned_clo: DEFAULT_CLOS[0],
+  faculty_name: 'Prof. Monir',
 };
 
 /* ==========================================================================
@@ -148,7 +207,7 @@ function parseQuestionsJson(source) {
 
   return {
     ok: true,
-    questions: parsed.map((entry) =>
+    questions: parsed.map((entry, idx) =>
       withKey({
         q_number: String(entry.q_number ?? ''),
         text: String(entry.text ?? ''),
@@ -157,6 +216,7 @@ function parseQuestionsJson(source) {
           ? entry.assigned_bloom_level
           : 'C1',
         assigned_clo: String(entry.assigned_clo ?? DEFAULT_CLOS[0]),
+        faculty_name: String(entry.faculty_name ?? (idx < 4 ? 'Prof. Monir' : 'Dr. Hasan')),
       })
     ),
   };
@@ -206,6 +266,7 @@ function parseCsvQuestions(source) {
       const rawBloom = (parts[3] || '').trim().toUpperCase();
       const bloom = BLOOM_LEVELS.includes(rawBloom) ? rawBloom : 'C1';
       const clo = (parts[4] || '').trim() || DEFAULT_CLOS[0];
+      const faculty = (parts[5] || '').trim() || (rows.length < 4 ? 'Prof. Monir' : 'Dr. Hasan');
 
       rows.push(
         withKey({
@@ -214,6 +275,7 @@ function parseCsvQuestions(source) {
           marks,
           assigned_bloom_level: bloom,
           assigned_clo: clo,
+          faculty_name: faculty,
         })
       );
     }
@@ -234,8 +296,19 @@ const FIELD_CLASS =
   'focus-ring w-full rounded-lg border border-border-default bg-bg-surface px-2.5 py-1.5 text-[13px] text-text-primary ' +
   'placeholder:text-text-muted transition-colors hover:border-border-strong';
 
-function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRemove }) {
+function QuestionRow({
+  question,
+  index,
+  clos,
+  verdict,
+  flagCount,
+  strengthScore,
+  strengthRating,
+  onChange,
+  onRemove,
+}) {
   const tone = verdict ? VERDICT_TONES[verdict] : null;
+  const strTone = strengthRating ? STRENGTH_TONES[strengthRating] : null;
 
   return (
     <li
@@ -245,7 +318,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
       )}
     >
       <div className="flex flex-wrap items-end gap-2">
-        <label className="w-20 shrink-0">
+        <label className="w-16 shrink-0">
           <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">No.</span>
           <input
             value={question.q_number}
@@ -255,7 +328,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
           />
         </label>
 
-        <label className="w-20 shrink-0">
+        <label className="w-16 shrink-0">
           <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">Marks</span>
           <input
             type="number"
@@ -267,7 +340,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
           />
         </label>
 
-        <label className="min-w-[7.5rem] flex-1">
+        <label className="min-w-[6.5rem] flex-1">
           <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">Bloom</span>
           <select
             value={question.assigned_bloom_level}
@@ -282,7 +355,7 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
           </select>
         </label>
 
-        <label className="w-24 shrink-0">
+        <label className="w-20 shrink-0">
           <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">CLO</span>
           <select
             value={question.assigned_clo}
@@ -292,6 +365,21 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
             {clos.map((clo) => (
               <option key={clo} value={clo}>
                 {clo}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="w-28 shrink-0">
+          <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-muted">Faculty</span>
+          <select
+            value={question.faculty_name || 'Prof. Monir'}
+            onChange={(event) => onChange(index, { faculty_name: event.target.value })}
+            className={FIELD_CLASS}
+          >
+            {FACULTY_OPTIONS.map((fac) => (
+              <option key={fac} value={fac}>
+                {fac}
               </option>
             ))}
           </select>
@@ -310,18 +398,45 @@ function QuestionRow({ question, index, clos, verdict, flagCount, onChange, onRe
       <textarea
         value={question.text}
         onChange={(event) => onChange(index, { text: event.target.value })}
-        rows={3}
+        rows={2}
         placeholder="Question stem…"
         className={cn(FIELD_CLASS, 'mt-2 resize-y leading-relaxed')}
       />
 
-      {tone ? (
-        <p className={cn('mt-2 flex items-center gap-1.5 text-[11px]', tone.text)}>
-          <AlertTriangle className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-          Moderation: {tone.label}
-          {flagCount ? ` · ${flagCount} ${flagCount === 1 ? 'flag' : 'flags'}` : ''}
-        </p>
-      ) : null}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded bg-bg-subtle px-1.5 py-0.5 text-[11px] text-text-secondary">
+            <Users className="h-3 w-3 text-text-muted" />
+            {question.faculty_name || 'Prof. Monir'}
+          </span>
+          <span className="rounded bg-bg-subtle px-1.5 py-0.5 font-mono text-[11px] text-text-secondary">
+            {question.assigned_clo || 'CLO1'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {strengthScore !== undefined && strTone ? (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium tabular-nums',
+                strTone.bg,
+                strTone.text
+              )}
+            >
+              <Sparkles className="h-3 w-3" />
+              Strength: {strengthScore}/100 ({strTone.label})
+            </span>
+          ) : null}
+
+          {tone ? (
+            <span className={cn('flex items-center gap-1 font-medium', tone.text)}>
+              <AlertTriangle className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+              {tone.label}
+              {flagCount ? ` · ${flagCount} ${flagCount === 1 ? 'flag' : 'flags'}` : ''}
+            </span>
+          ) : null}
+        </div>
+      </div>
     </li>
   );
 }
@@ -646,9 +761,296 @@ function CognitiveDemandHeatmap({ questions, balance }) {
   );
 }
 
+function ObeAccreditationCard({ obeCoverage }) {
+  if (!obeCoverage) return null;
+
+  const tone = OBE_VERDICT_TONES[obeCoverage.verdict] ?? OBE_VERDICT_TONES['Partially Compliant'];
+  const complianceScore = Math.round(obeCoverage.compliance_score ?? 0);
+
+  return (
+    <Card className="border-border-default overflow-hidden">
+      <CardHeader
+        icon={GraduationCap}
+        title="Outcome-Based Education (OBE) Audit"
+        subtitle="Departmental compliance scorecard benchmarked against Washington Accord criteria"
+        action={
+          <Badge variant={tone.badge} dot>
+            {obeCoverage.verdict}
+          </Badge>
+        }
+      />
+      <CardBody className="space-y-4">
+        {/* Score and Primary Metrics Header */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className={cn('rounded-lg border p-3 flex flex-col justify-between', tone.border, tone.bg)}>
+            <div className="text-[11px] uppercase tracking-wide font-medium text-text-muted">
+              OBE Compliance Score
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className={cn('text-3xl font-bold tabular-nums', tone.text)}>
+                {complianceScore}
+              </span>
+              <span className="text-xs text-text-muted">/ 100</span>
+            </div>
+            <div className="mt-2 text-[11px] font-medium text-text-secondary">
+              Verdict: <span className={tone.text}>{obeCoverage.verdict}</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border-default bg-bg-subtle p-3 flex flex-col justify-between">
+            <div className="text-[11px] uppercase tracking-wide font-medium text-text-muted">
+              CLO Coverage
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className={cn('text-2xl font-bold tabular-nums', obeCoverage.all_clos_covered ? 'text-pass-text' : 'text-critical-text')}>
+                {obeCoverage.all_clos_covered ? '4 / 4' : `${4 - (obeCoverage.missing_clos?.length ?? 0)} / 4`}
+              </span>
+              <span className="text-xs text-text-muted">CLOs Assessed</span>
+            </div>
+            <div className="mt-2 text-[11px] text-text-secondary">
+              {obeCoverage.missing_clos?.length ? (
+                <span className="text-critical-text font-semibold">Missing: {obeCoverage.missing_clos.join(', ')}</span>
+              ) : (
+                <span className="text-pass-text font-medium">100% Curriculum Scope Covered</span>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border-default bg-bg-subtle p-3 flex flex-col justify-between">
+            <div className="text-[11px] uppercase tracking-wide font-medium text-text-muted">
+              Higher-Order HOTS (C4–C6)
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className={cn('text-2xl font-bold tabular-nums', (obeCoverage.higher_order_pct ?? 0) >= 35 ? 'text-pass-text' : 'text-warning-text')}>
+                {pct(obeCoverage.higher_order_pct, 1)}
+              </span>
+              <span className="text-xs text-text-muted">(OBE min: 35%)</span>
+            </div>
+            <div className="mt-2 text-[11px] text-text-secondary">
+              Complex Tasks (C5/C6): {obeCoverage.has_c5_c6 ? (
+                <span className="text-pass-text font-medium">Verified</span>
+              ) : (
+                <span className="text-warning-text font-semibold">Missing (0 questions)</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Missing CLO Alert Banner */}
+        {obeCoverage.missing_clos?.length > 0 ? (
+          <div className="flex items-start gap-2.5 rounded-lg border border-critical-border bg-critical-fill p-3 text-[12px] leading-relaxed text-critical-text">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-critical-text" />
+            <div>
+              <span className="font-semibold">Accreditation Alert: </span>
+              Course Learning Outcome <strong>{obeCoverage.missing_clos.join(', ')}</strong> is completely unassessed in this draft exam (0 marks allocated). Outcome-Based Education requires all defined course outcomes to be formally evaluated.
+            </div>
+          </div>
+        ) : null}
+
+        {/* CLO Mark Distribution Breakdown */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-semibold uppercase tracking-wide text-text-muted">
+              Course Learning Outcomes (CLO) Mark Weighting
+            </span>
+            <span className="text-text-muted">Target: Even distribution across outcomes</span>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {Object.entries(obeCoverage.clo_distribution ?? {}).map(([cloKey, dist]) => {
+              const isZero = dist.marks === 0;
+              return (
+                <div
+                  key={cloKey}
+                  className={cn(
+                    'rounded-lg border p-2.5 transition-colors',
+                    isZero ? 'border-critical-border bg-critical-fill/40' : 'border-border-default bg-bg-surface'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={cn('font-mono font-bold text-xs px-1.5 py-0.5 rounded shrink-0', isZero ? 'bg-critical-border text-white' : 'bg-bg-subtle text-text-primary')}>
+                        {cloKey}
+                      </span>
+                      <span className="text-[11px] font-medium text-text-secondary truncate" title={dist.description}>
+                        {dist.description}
+                      </span>
+                    </div>
+                    <span className={cn('tabular-nums font-semibold text-xs shrink-0 pl-2', isZero ? 'text-critical-text' : 'text-text-primary')}>
+                      {num(dist.marks, 1)}m ({pct(dist.percentage, 1)})
+                    </span>
+                  </div>
+
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-bg-subtle">
+                    <div
+                      className={cn('h-full rounded transition-all', isZero ? 'bg-critical-border' : 'bg-action-primary')}
+                      style={{ width: `${Math.min(100, Math.max(0, dist.percentage))}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Accreditation Checklist */}
+        <div className="space-y-2 pt-1">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+            Accreditation Checklist & Compliance Rules
+          </div>
+          <ul className="divide-y divide-border-default rounded-lg border border-border-default bg-bg-subtle">
+            {(obeCoverage.checks ?? []).map((check) => {
+              const isPass = check.status === 'pass';
+              const isWarn = check.status === 'warning';
+              return (
+                <li key={check.id} className="flex items-start gap-2.5 p-2.5 text-[12px]">
+                  {isPass ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-pass-text" />
+                  ) : isWarn ? (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-text" />
+                  ) : (
+                    <X className="mt-0.5 h-4 w-4 shrink-0 text-critical-text" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-text-primary">{check.label}</span>
+                      <Badge variant={isPass ? 'pass' : isWarn ? 'warning' : 'critical'}>
+                        {isPass ? 'Compliant' : isWarn ? 'Warning' : 'Defect'}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-text-secondary leading-relaxed">{check.message}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {/* Actionable Recommendations */}
+        {obeCoverage.recommendations?.length > 0 ? (
+          <div className="rounded-lg border border-border-default bg-bg-subtle p-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <Target className="h-3.5 w-3.5 text-action-primary" />
+              Departmental Remediation Actions
+            </div>
+            <ul className="space-y-1 pl-4 list-disc text-[12px] text-text-secondary leading-relaxed">
+              {obeCoverage.recommendations.map((rec, idx) => (
+                <li key={idx}>{rec}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </CardBody>
+    </Card>
+  );
+}
+
+function MultiFacultyCard({ summary, facultyFilter, onSelectFaculty }) {
+  if (!summary || !summary.faculty_breakdown?.length) return null;
+
+  return (
+    <Card>
+      <CardHeader
+        icon={Users}
+        title="Multi-Faculty Question Submissions"
+        subtitle={`Audit of proposed exam questions submitted by ${summary.faculty_count} faculty members`}
+        action={
+          <Badge variant="neutral">
+            {summary.faculty_count} {summary.faculty_count === 1 ? 'Faculty Contributor' : 'Faculty Contributors'}
+          </Badge>
+        }
+      />
+      <CardBody className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          {summary.faculty_breakdown.map((fac) => {
+            const strScore = Math.round(fac.avg_strength_score ?? 75);
+            const strRating = strScore >= 80 ? 'Strong' : strScore >= 60 ? 'Moderate' : 'Needs Revision';
+            const tone = STRENGTH_TONES[strRating] ?? STRENGTH_TONES.Moderate;
+            const isSelected = facultyFilter === fac.faculty_name;
+
+            return (
+              <div
+                key={fac.faculty_name}
+                onClick={() => onSelectFaculty && onSelectFaculty(isSelected ? 'all' : fac.faculty_name)}
+                className={cn(
+                  'rounded-lg border p-3.5 space-y-3 cursor-pointer transition-all hover:border-action-primary/50',
+                  isSelected
+                    ? 'border-action-primary bg-action-primary/5 ring-1 ring-action-primary'
+                    : 'border-border-default bg-bg-surface'
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-full bg-action-primary/10 text-action-primary flex items-center justify-center font-bold text-xs border border-action-primary/20">
+                      {fac.faculty_name.split(' ').map((n) => n[0]).join('')}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[13px] text-text-heading">{fac.faculty_name}</div>
+                      <div className="text-[11px] text-text-muted">
+                        Questions:{' '}
+                        <span className="font-medium text-text-secondary">
+                          {fac.question_numbers?.join(', ')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Badge variant={tone.badge}>
+                    {strScore}/100 · {strRating}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="rounded border border-border-default bg-bg-subtle p-2">
+                    <div className="text-[10px] uppercase tracking-wide text-text-muted">
+                      Mark Contribution
+                    </div>
+                    <div className="text-base font-bold tabular-nums text-text-primary">
+                      {num(fac.total_marks, 1)}m
+                      <span className="text-xs font-normal text-text-muted">
+                        {' '}
+                        ({pct(fac.marks_share_pct, 1)})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded border border-border-default bg-bg-subtle p-2">
+                    <div className="text-[10px] uppercase tracking-wide text-text-muted">Questions</div>
+                    <div className="text-base font-bold tabular-nums text-text-primary">
+                      {fac.question_count}
+                      <span className="text-xs font-normal text-text-muted"> questions</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-1 border-t border-border-default pt-1 text-[11px] text-text-secondary">
+                  <span>
+                    Mapped CLOs: <strong>{fac.clos_covered?.join(', ') || 'None'}</strong>
+                  </span>
+                  <span>
+                    Cognitive:{' '}
+                    <strong>
+                      {Object.entries(fac.bloom_distribution || {})
+                        .map(([b, c]) => `${b}: ${c}`)
+                        .join(', ')}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 function LintRow({ question, expanded, onToggle }) {
   const tone = VERDICT_TONES[question.verdict] ?? VERDICT_TONES.pass;
   const bloomDrift = question.detected_bloom_level !== question.assigned_bloom_level;
+  const strScore = question.strength_score;
+  const strRating = question.strength_rating;
+  const strTone = strRating ? STRENGTH_TONES[strRating] ?? STRENGTH_TONES.Moderate : null;
 
   return (
     <li className={cn('border-l-2 bg-bg-surface', tone.border)}>
@@ -662,14 +1064,38 @@ function LintRow({ question, expanded, onToggle }) {
           {question.q_number}
         </span>
 
-        <span
-          className={cn(
-            'min-w-0 flex-1 text-[13px] leading-relaxed text-text-secondary',
-            !expanded && 'line-clamp-2'
-          )}
-        >
-          {question.text}
-        </span>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded border border-border-default bg-bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-text-secondary">
+              <Users className="h-2.5 w-2.5 text-text-muted" />
+              {question.faculty_name || 'Prof. Monir'}
+            </span>
+            <span className="rounded border border-border-default bg-bg-subtle px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-secondary">
+              {question.assigned_clo || 'CLO1'}
+            </span>
+            {strScore !== undefined && strTone ? (
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                  strTone.bg,
+                  strTone.text
+                )}
+              >
+                <Sparkles className="h-2.5 w-2.5" />
+                Strength: {strScore}/100 ({strTone.label})
+              </span>
+            ) : null}
+          </div>
+
+          <span
+            className={cn(
+              'block text-[13px] leading-relaxed text-text-secondary',
+              !expanded && 'line-clamp-2'
+            )}
+          >
+            {question.text}
+          </span>
+        </div>
 
         <span className="flex shrink-0 items-center gap-2 pt-0.5">
           <span className="text-[12px] tabular-nums text-text-muted">{num(question.marks, 0)}m</span>
@@ -692,13 +1118,97 @@ function LintRow({ question, expanded, onToggle }) {
           <p className="text-[13px] leading-relaxed text-text-primary">{question.text}</p>
 
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="text-text-muted">Tagged</span>
+            <span className="text-text-muted">Author:</span>
+            <Badge variant="neutral">{question.faculty_name || 'Prof. Monir'}</Badge>
+            <span className="text-text-muted">CLO:</span>
+            <Badge variant="neutral">{question.assigned_clo || 'CLO1'}</Badge>
+            <span className="text-text-muted">Tagged Bloom:</span>
             <Badge>{BLOOM_LABELS[question.assigned_bloom_level] ?? question.assigned_bloom_level}</Badge>
-            <span className="text-text-muted">Detected</span>
+            <span className="text-text-muted">Detected Bloom:</span>
             <Badge variant={bloomDrift ? tone.badge : 'neutral'}>
               {BLOOM_LABELS[question.detected_bloom_level] ?? question.detected_bloom_level}
             </Badge>
           </div>
+
+          {/* AI Question Strength & Historical Benchmark Card */}
+          {question.strength_feedback && strTone ? (
+            <div className={cn('space-y-2.5 rounded-lg border p-3', strTone.border, strTone.bg)}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Sparkles className={cn('h-4 w-4', strTone.text)} />
+                  <span className={strTone.text}>
+                    AI Question Strength: {question.strength_score}/100 ({strTone.label})
+                  </span>
+                </div>
+                <span className="text-[11px] text-text-muted">Benchmarked against past exam archives</span>
+              </div>
+
+              <p className="text-[12px] leading-relaxed text-text-primary">
+                {question.strength_feedback}
+              </p>
+
+              {question.strength_metrics ? (
+                <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-4">
+                  <div className="rounded border border-border-default bg-bg-surface p-2">
+                    <div className="text-[9px] uppercase tracking-wide text-text-muted">
+                      Originality vs Past Papers
+                    </div>
+                    <div className="text-xs font-bold tabular-nums text-text-primary">
+                      {question.strength_metrics.originality}%
+                    </div>
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded bg-bg-subtle">
+                      <div
+                        className="h-full rounded bg-action-primary"
+                        style={{ width: `${question.strength_metrics.originality}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded border border-border-default bg-bg-surface p-2">
+                    <div className="text-[9px] uppercase tracking-wide text-text-muted">
+                      Cognitive Rigor
+                    </div>
+                    <div className="text-xs font-bold tabular-nums text-text-primary">
+                      {question.strength_metrics.cognitive_rigor}%
+                    </div>
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded bg-bg-subtle">
+                      <div
+                        className="h-full rounded bg-action-primary"
+                        style={{ width: `${question.strength_metrics.cognitive_rigor}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded border border-border-default bg-bg-surface p-2">
+                    <div className="text-[9px] uppercase tracking-wide text-text-muted">
+                      Mark Feasibility
+                    </div>
+                    <div className="text-xs font-bold tabular-nums text-text-primary">
+                      {question.strength_metrics.mark_feasibility}%
+                    </div>
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded bg-bg-subtle">
+                      <div
+                        className="h-full rounded bg-action-primary"
+                        style={{ width: `${question.strength_metrics.mark_feasibility}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded border border-border-default bg-bg-surface p-2">
+                    <div className="text-[9px] uppercase tracking-wide text-text-muted">
+                      Clarity & Depth
+                    </div>
+                    <div className="text-xs font-bold tabular-nums text-text-primary">
+                      {question.strength_metrics.clarity}%
+                    </div>
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded bg-bg-subtle">
+                      <div
+                        className="h-full rounded bg-action-primary"
+                        style={{ width: `${question.strength_metrics.clarity}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {question.flags?.length ? (
             <ul className="space-y-2">
@@ -921,6 +1431,30 @@ function ScorecardSkeleton({ stage }) {
         </CardBody>
       </Card>
 
+      {/* OBE Card Skeleton */}
+      <Card>
+        <CardHeader icon={GraduationCap} title="Outcome-Based Education (OBE) Audit" subtitle={stage} />
+        <CardBody className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+          </div>
+          <Skeleton className="h-14 w-full" />
+        </CardBody>
+      </Card>
+
+      {/* Multi-Faculty Skeleton */}
+      <Card>
+        <CardHeader icon={Users} title="Multi-Faculty Question Submissions" subtitle={stage} />
+        <CardBody>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </div>
+        </CardBody>
+      </Card>
+
       <div className="flex flex-col gap-4 xl:flex-row">
         <Card className="flex-1">
           <CardHeader icon={ListTree} title="Bloom alignment" />
@@ -973,6 +1507,10 @@ export default function ExamModerationPage() {
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [runCount, setRunCount] = useState(0);
+
+  // Multi-Faculty & Course Selection state
+  const [selectedCourseId, setSelectedCourseId] = useState(1);
+  const [facultyFilter, setFacultyFilter] = useState('all');
 
   const examsQuery = useQuery({ queryKey: QUERY_KEYS.exams, queryFn: () => get(ENDPOINTS.exams) });
 
@@ -1031,18 +1569,23 @@ export default function ExamModerationPage() {
   const addQuestion = () =>
     setQuestions((current) => [
       ...current,
-      withKey({ ...EMPTY_QUESTION, q_number: String(current.length + 1) }),
+      withKey({
+        ...EMPTY_QUESTION,
+        q_number: String(current.length + 1),
+        faculty_name: facultyFilter !== 'all' ? facultyFilter : 'Prof. Monir',
+      }),
     ]);
 
-  const runAudit = (customQuestions = null, customTotal = null) => {
+  const runAudit = (customQuestions = null, customTotal = null, customCourseId = null) => {
     const qList = customQuestions ?? questions;
     const declaredTotal = customTotal ?? (exam?.total_marks ?? 70);
+    const courseId = customCourseId ?? selectedCourseId;
 
     if (qList.length > 0) {
       auditMutation.mutate({
         questions: qList.map(toDraftQuestion),
         declared_total: declaredTotal,
-        course_id: exam?.course_id ?? 1,
+        course_id: courseId,
       });
     } else if (exam?.id) {
       auditMutation.mutate({ exam_id: exam.id });
@@ -1067,6 +1610,7 @@ export default function ExamModerationPage() {
 
       const rows = loaded.map(withKey);
       setExam(draft);
+      setSelectedCourseId(draft.course_id ?? 1);
       setQuestions(rows);
       setJsonDraft(serialize(rows));
 
@@ -1094,10 +1638,13 @@ export default function ExamModerationPage() {
       const rows = data.map(withKey);
       const syntheticExam = {
         id: null,
-        course_code: 'CSE 2101',
-        course_id: 1,
+        course_code: selectedCourseId === 2 ? 'CSE 2103' : 'CSE 2101',
+        course_id: selectedCourseId,
         semester: 'Fall 2025',
-        exam_type: sampleType === 'defective' ? 'Draft (Planted Anomalies)' : 'Draft (Balanced)',
+        exam_type:
+          sampleType === 'defective'
+            ? 'Joint Multi-Faculty Draft (Monir + Hasan)'
+            : 'OBE-Compliant Multi-Faculty Sample',
         status: 'draft',
         total_marks: 70,
       };
@@ -1108,12 +1655,19 @@ export default function ExamModerationPage() {
       auditMutation.mutate({
         questions: rows.map(toDraftQuestion),
         declared_total: 70,
-        course_id: 1,
+        course_id: selectedCourseId,
       });
     } catch (err) {
       setLoadError(err.message ?? 'Could not load sample.');
     } finally {
       setLoadingDraft(false);
+    }
+  };
+
+  const handleCourseChange = (newCourseId) => {
+    setSelectedCourseId(newCourseId);
+    if (questions.length > 0) {
+      runAudit(null, null, newCourseId);
     }
   };
 
@@ -1138,10 +1692,10 @@ export default function ExamModerationPage() {
       const rows = result.questions;
       const syntheticExam = {
         id: null,
-        course_code: 'CSE 2101',
-        course_id: 1,
+        course_code: selectedCourseId === 2 ? 'CSE 2103' : 'CSE 2101',
+        course_id: selectedCourseId,
         semester: 'Fall 2025',
-        exam_type: `Uploaded (${file.name})`,
+        exam_type: `Uploaded Multi-Faculty Paper (${file.name})`,
         status: 'draft',
         total_marks: 70,
       };
@@ -1152,7 +1706,7 @@ export default function ExamModerationPage() {
       auditMutation.mutate({
         questions: rows.map(toDraftQuestion),
         declared_total: 70,
-        course_id: 1,
+        course_id: selectedCourseId,
       });
     };
 
@@ -1164,10 +1718,13 @@ export default function ExamModerationPage() {
     event.target.value = '';
   };
 
+  // On initial mount, load the joint multi-faculty draft so the user immediately sees the multi-faculty & OBE evaluations
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('autorun') === '1') {
       loadDemoExam(true);
+    } else {
+      loadSample('defective');
     }
   }, []);
 
@@ -1176,10 +1733,33 @@ export default function ExamModerationPage() {
     return [...new Set([...DEFAULT_CLOS, ...used])].sort();
   }, [questions]);
 
+  // Extract distinct faculty members currently contributing to the draft
+  const facultyMembers = useMemo(() => {
+    const set = new Set(questions.map((q) => q.faculty_name || 'Prof. Monir'));
+    return Array.from(set);
+  }, [questions]);
+
+  // Questions filtered by the selected faculty tab
+  const displayedQuestions = useMemo(() => {
+    if (facultyFilter === 'all') return questions;
+    return questions.filter((q) => (q.faculty_name || 'Prof. Monir') === facultyFilter);
+  }, [questions, facultyFilter]);
+
   const verdictByQuestion = useMemo(() => {
     const map = new Map();
     for (const question of report?.questions ?? []) {
       map.set(question.q_number, { verdict: question.verdict, flags: question.flags?.length ?? 0 });
+    }
+    return map;
+  }, [report]);
+
+  const echoStrengthByQuestion = useMemo(() => {
+    const map = new Map();
+    for (const question of report?.questions ?? []) {
+      map.set(question.q_number, {
+        score: question.strength_score,
+        rating: question.strength_rating,
+      });
     }
     return map;
   }, [report]);
@@ -1200,11 +1780,11 @@ export default function ExamModerationPage() {
       <Card>
         <CardHeader
           icon={Braces}
-          title="Question editor"
+          title="Multi-Faculty Question Hub"
           subtitle={
             exam
-              ? `${exam.course_code} · ${exam.semester} ${exam.exam_type}`
-              : 'Upload an exam paper, pick a sample, or draft from scratch.'
+              ? `${exam.course_code} · ${exam.exam_type}`
+              : 'Submit proposed questions from multiple faculty members for moderation.'
           }
           action={
             <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-subtle p-0.5">
@@ -1229,16 +1809,66 @@ export default function ExamModerationPage() {
         />
 
         <CardBody className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Upload}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Upload Exam (.json / .csv)
-            </Button>
+          {/* Target Course Selector Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-default bg-bg-subtle p-2.5">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-action-primary" />
+              <span className="text-xs font-semibold text-text-primary">Target Course:</span>
+              <select
+                value={selectedCourseId}
+                onChange={(e) => handleCourseChange(Number(e.target.value))}
+                className="rounded border border-border-default bg-bg-surface px-2.5 py-1 text-xs font-medium text-text-primary"
+              >
+                <option value={1}>CSE 2101 · Data Structures (Fall 2025)</option>
+                <option value={2}>CSE 2103 · Algorithms (Spring 2025)</option>
+              </select>
+            </div>
 
+            <div className="text-[11px] text-text-muted">
+              Declared Total: <span className="font-semibold text-text-primary">70 Marks</span>
+            </div>
+          </div>
+
+          {/* Collaborative Multi-Faculty Filter Tabs */}
+          {facultyMembers.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-border-default pb-2">
+              <span className="mr-1 text-[11px] font-medium text-text-muted">View Submissions:</span>
+              <button
+                type="button"
+                onClick={() => setFacultyFilter('all')}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                  facultyFilter === 'all'
+                    ? 'bg-action-primary text-white shadow-sm'
+                    : 'bg-bg-subtle text-text-secondary hover:bg-bg-hover'
+                )}
+              >
+                All Faculty ({questions.length})
+              </button>
+              {facultyMembers.map((fac) => {
+                const count = questions.filter((q) => (q.faculty_name || 'Prof. Monir') === fac).length;
+                return (
+                  <button
+                    key={fac}
+                    type="button"
+                    onClick={() => setFacultyFilter(fac)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                      facultyFilter === fac
+                        ? 'bg-action-primary text-white shadow-sm'
+                        : 'bg-bg-subtle text-text-secondary hover:bg-bg-hover'
+                    )}
+                  >
+                    <Users className="h-3 w-3" />
+                    {fac} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {/* Action Buttons & Presets */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -1247,7 +1877,7 @@ export default function ExamModerationPage() {
               onClick={() => loadSample('defective')}
               className="border-warning-border text-warning-text hover:bg-warning-fill"
             >
-              Defective Sample
+              Joint Draft (Monir + Hasan)
             </Button>
 
             <Button
@@ -1258,7 +1888,16 @@ export default function ExamModerationPage() {
               onClick={() => loadSample('balanced')}
               className="border-pass-border text-pass-text hover:bg-pass-fill"
             >
-              Balanced Sample
+              OBE-Compliant Sample
+            </Button>
+
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Upload}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload Exam (.json/.csv)
             </Button>
 
             <Button
@@ -1286,7 +1925,7 @@ export default function ExamModerationPage() {
               download="sample_exam_defective.csv"
               className="inline-flex items-center gap-1 font-mono text-warning-text underline decoration-warning-border hover:opacity-80"
             >
-              <Download className="h-3 w-3" /> Defective (.csv)
+              <Download className="h-3 w-3" /> Joint Draft (.csv)
             </a>
             <span className="text-text-muted">·</span>
             <a
@@ -1294,7 +1933,7 @@ export default function ExamModerationPage() {
               download="sample_exam_balanced.csv"
               className="inline-flex items-center gap-1 font-mono text-pass-text underline decoration-pass-border hover:opacity-80"
             >
-              <Download className="h-3 w-3" /> Balanced (.csv)
+              <Download className="h-3 w-3" /> OBE Balanced (.csv)
             </a>
             <span className="text-text-muted">·</span>
             <a
@@ -1302,7 +1941,7 @@ export default function ExamModerationPage() {
               download="sample_exam_defective.json"
               className="inline-flex items-center gap-1 font-mono text-text-secondary underline hover:text-text-heading"
             >
-              <Download className="h-3 w-3" /> Defective (.json)
+              <Download className="h-3 w-3" /> Joint Draft (.json)
             </a>
           </div>
 
@@ -1310,18 +1949,22 @@ export default function ExamModerationPage() {
 
           {mode === 'json' ? (
             <JsonEditor value={jsonDraft} onChange={onJsonChange} validity={jsonValidity} />
-          ) : questions.length ? (
+          ) : displayedQuestions.length ? (
             <ul className="space-y-2">
-              {questions.map((question, index) => {
+              {displayedQuestions.map((question) => {
+                const originalIndex = questions.findIndex((q) => q._key === question._key);
                 const echo = verdictByQuestion.get(question.q_number);
+                const strength = echoStrengthByQuestion.get(question.q_number);
                 return (
                   <QuestionRow
                     key={question._key}
                     question={question}
-                    index={index}
+                    index={originalIndex}
                     clos={clos}
                     verdict={echo?.verdict}
                     flagCount={echo?.flags}
+                    strengthScore={strength?.score}
+                    strengthRating={strength?.rating}
                     onChange={updateQuestion}
                     onRemove={removeQuestion}
                   />
@@ -1331,9 +1974,9 @@ export default function ExamModerationPage() {
           ) : (
             <EmptyState
               icon={Braces}
-              title="No questions loaded yet"
-              description="Upload a CSV/JSON exam paper, load a ready sample to test planted defects, or add questions manually."
-              actionLabel="Load Defective Sample"
+              title="No questions loaded for this filter"
+              description="Switch faculty filter or load a multi-faculty draft to view proposed exam questions."
+              actionLabel="Load Multi-Faculty Draft"
               onAction={() => loadSample('defective')}
             />
           )}
@@ -1350,12 +1993,12 @@ export default function ExamModerationPage() {
             disabled={!canRun}
             onClick={() => runAudit()}
           >
-            Run Moderation Audit
+            Run Multi-Faculty & OBE Moderation
           </Button>
 
           {!exam && questions.length === 0 ? (
             <p className="text-center text-[11px] text-text-muted">
-              Upload a paper or load a sample to run real-time moderation.
+              Upload a paper or click Joint Draft to run real-time moderation.
             </p>
           ) : null}
         </div>
@@ -1368,7 +2011,7 @@ export default function ExamModerationPage() {
             <EmptyState
               icon={BadgeCheck}
               title="No moderation run yet"
-              description="Upload an exam paper (.json/.csv) or click one of the sample buttons on the left to see real-time Bloom verification, past-paper duplicate alerts, and mark feasibility."
+              description="Select a multi-faculty draft or upload an exam paper to see question strength benchmarked against previous exams and an Outcome-Based Education (OBE) coverage audit."
             />
           </Card>
         ) : auditMutation.isError ? (
@@ -1387,6 +2030,16 @@ export default function ExamModerationPage() {
         ) : (
           <>
             <ScorecardHeader report={report} exam={exam} />
+
+            {/* Outcome-Based Education (OBE) Audit Panel */}
+            <ObeAccreditationCard obeCoverage={report.obe_coverage} />
+
+            {/* Multi-Faculty Submission Breakdown Panel */}
+            <MultiFacultyCard
+              summary={report.multi_faculty_summary}
+              facultyFilter={facultyFilter}
+              onSelectFaculty={setFacultyFilter}
+            />
 
             <div className="flex flex-col gap-4 xl:flex-row">
               <BloomAlignmentGauge questions={report.questions} />
@@ -1408,3 +2061,4 @@ export default function ExamModerationPage() {
     </div>
   );
 }
+

@@ -17,6 +17,7 @@ class ExamQuestion extends Model
         'marks',
         'assigned_bloom_level',
         'assigned_clo',
+        'faculty_name',
         'is_past_paper',
     ];
 

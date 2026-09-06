@@ -311,6 +311,126 @@ class AuditEnginesTest extends TestCase
         $this->assertNotEmpty($resDefective->json('data.duplicates'));
     }
 
+    public function test_exam_moderator_evaluates_multi_faculty_contributions_and_obe_coverage(): void
+    {
+        $multiFacultyQuestions = [
+            [
+                'q_number' => '1',
+                'text' => 'Compare the pointer semantics and memory fragmentation of contiguous arrays versus linked representations.',
+                'marks' => 15.0,
+                'assigned_bloom_level' => 'C2',
+                'assigned_clo' => 'CLO1',
+                'faculty_name' => 'Prof. Monir',
+            ],
+            [
+                'q_number' => '2',
+                'text' => 'Apply Dijkstra single-source shortest path on a weighted DAG and show distance table updates.',
+                'marks' => 20.0,
+                'assigned_bloom_level' => 'C3',
+                'assigned_clo' => 'CLO2',
+                'faculty_name' => 'Prof. Monir',
+            ],
+            [
+                'q_number' => '3',
+                'text' => 'Analyze the worst-case amortization bounds for dynamic table doubling under sequence of N insertions.',
+                'marks' => 15.0,
+                'assigned_bloom_level' => 'C4',
+                'assigned_clo' => 'CLO3',
+                'faculty_name' => 'Dr. Hasan',
+            ],
+            [
+                'q_number' => '4',
+                'text' => 'Synthesize and formulate an augmented Interval Tree structure supporting range intersection in O(k log n).',
+                'marks' => 20.0,
+                'assigned_bloom_level' => 'C6',
+                'assigned_clo' => 'CLO4',
+                'faculty_name' => 'Dr. Hasan',
+            ],
+        ];
+
+        $response = $this->postJson('/api/audit/exam-moderation', [
+            'declared_total' => 70,
+            'course_id' => $this->courseCSE2101->id,
+            'questions' => $multiFacultyQuestions,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'mark_sum_valid',
+                    'calculated_total',
+                    'declared_total',
+                    'questions' => [
+                        '*' => [
+                            'q_number',
+                            'faculty_name',
+                            'assigned_clo',
+                            'strength_score',
+                            'strength_rating',
+                            'strength_metrics' => [
+                                'originality',
+                                'cognitive_rigor',
+                                'mark_feasibility',
+                                'clarity',
+                            ],
+                            'strength_feedback',
+                        ],
+                    ],
+                    'obe_coverage' => [
+                        'compliance_score',
+                        'verdict',
+                        'all_clos_covered',
+                        'missing_clos',
+                        'higher_order_pct',
+                        'has_c5_c6',
+                        'clo_distribution',
+                        'checks',
+                        'recommendations',
+                    ],
+                    'multi_faculty_summary' => [
+                        'faculty_count',
+                        'faculty_breakdown' => [
+                            '*' => [
+                                'faculty_name',
+                                'question_count',
+                                'total_marks',
+                                'marks_share_pct',
+                                'avg_strength_score',
+                                'clos_covered',
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+
+        $data = $response->json('data');
+
+        // Multi-faculty assertions
+        $this->assertEquals(2, $data['multi_faculty_summary']['faculty_count']);
+        $monir = collect($data['multi_faculty_summary']['faculty_breakdown'])->firstWhere('faculty_name', 'Prof. Monir');
+        $hasan = collect($data['multi_faculty_summary']['faculty_breakdown'])->firstWhere('faculty_name', 'Dr. Hasan');
+        $this->assertNotNull($monir);
+        $this->assertNotNull($hasan);
+        $this->assertEquals(2, $monir['question_count']);
+        $this->assertEquals(35.0, $monir['total_marks']);
+        $this->assertEquals(2, $hasan['question_count']);
+        $this->assertEquals(35.0, $hasan['total_marks']);
+
+        // OBE assertions
+        $this->assertTrue($data['obe_coverage']['all_clos_covered']);
+        $this->assertEmpty($data['obe_coverage']['missing_clos']);
+        $this->assertTrue($data['obe_coverage']['has_c5_c6']);
+        $this->assertEquals(50.0, $data['obe_coverage']['higher_order_pct']);
+        $this->assertGreaterThanOrEqual(85, $data['obe_coverage']['compliance_score']);
+        $this->assertEquals('OBE Compliant', $data['obe_coverage']['verdict']);
+
+        // Question Strength assertions
+        $q4 = collect($data['questions'])->firstWhere('q_number', '4');
+        $this->assertEquals('Strong', $q4['strength_rating']);
+        $this->assertGreaterThanOrEqual(80, $q4['strength_score']);
+        $this->assertNotEmpty($q4['strength_feedback']);
+    }
+
     public function test_vulnerable_students_handles_custom_uploaded_cohort_without_ai(): void
     {
         // 1. Test High Risk Cohort

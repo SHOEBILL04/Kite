@@ -615,8 +615,20 @@ export const MOCK_EXAM_MODERATION = {
       marks: 10,
       assigned_bloom_level: 'C2',
       detected_bloom_level: 'C2',
+      assigned_clo: 'CLO1',
+      faculty_name: 'Prof. Monir',
       verdict: 'pass',
       flags: [],
+      strength_score: 88,
+      strength_rating: 'Strong',
+      strength_metrics: {
+        originality: 95,
+        cognitive_rigor: 75,
+        mark_feasibility: 95,
+        clarity: 90,
+      },
+      strength_feedback:
+        'Solid foundational question (Score: 88/100). Novel problem setting compared to Fall 2024 past papers with clear memory lifecycle constraints.',
     },
     {
       q_number: '2(a)',
@@ -624,6 +636,8 @@ export const MOCK_EXAM_MODERATION = {
       marks: 8,
       assigned_bloom_level: 'C4',
       detected_bloom_level: 'C1',
+      assigned_clo: 'CLO2',
+      faculty_name: 'Prof. Monir',
       verdict: 'critical',
       flags: [
         {
@@ -637,6 +651,16 @@ export const MOCK_EXAM_MODERATION = {
             'CLO2 analytical coverage is credited 8 marks by this tagging while the task requires only recall.',
         },
       ],
+      strength_score: 35,
+      strength_rating: 'Needs Revision',
+      strength_metrics: {
+        originality: 90,
+        cognitive_rigor: 20,
+        mark_feasibility: 95,
+        clarity: 80,
+      },
+      strength_feedback:
+        'Cognitive overstatement defect (Score: 35/100): Question carries a C4 (Analyse) label, but action verbs "State" and "list" only test C1 recall. Low discriminatory power for an advanced exam.',
     },
     {
       q_number: '3',
@@ -644,8 +668,20 @@ export const MOCK_EXAM_MODERATION = {
       marks: 10,
       assigned_bloom_level: 'C3',
       detected_bloom_level: 'C3',
+      assigned_clo: 'CLO2',
+      faculty_name: 'Prof. Monir',
       verdict: 'pass',
       flags: [],
+      strength_score: 84,
+      strength_rating: 'Strong',
+      strength_metrics: {
+        originality: 95,
+        cognitive_rigor: 75,
+        mark_feasibility: 95,
+        clarity: 90,
+      },
+      strength_feedback:
+        'Strong algorithmic tracing task (Score: 84/100). Clean execution criteria for front/rear pointers distinct from circulating archives.',
     },
     {
       q_number: '4',
@@ -653,6 +689,8 @@ export const MOCK_EXAM_MODERATION = {
       marks: 10,
       assigned_bloom_level: 'C3',
       detected_bloom_level: 'C3',
+      assigned_clo: 'CLO3',
+      faculty_name: 'Prof. Monir',
       verdict: 'critical',
       flags: [
         {
@@ -661,6 +699,16 @@ export const MOCK_EXAM_MODERATION = {
             'Verbatim match against Fall 2024 Final Q4 (similarity 0.97), including the identical edge set. The paper is in circulation.',
         },
       ],
+      strength_score: 22,
+      strength_rating: 'Needs Revision',
+      strength_metrics: {
+        originality: 10,
+        cognitive_rigor: 75,
+        mark_feasibility: 95,
+        clarity: 85,
+      },
+      strength_feedback:
+        'Severe originality defect (Score: 22/100): 97% textual match against Fall 2024 Final Q4. Identical edge set is already circulating in student solution keys. Solution can be recalled from memory.',
     },
     {
       q_number: '5(b)',
@@ -668,6 +716,8 @@ export const MOCK_EXAM_MODERATION = {
       marks: 2,
       assigned_bloom_level: 'C4',
       detected_bloom_level: 'C5',
+      assigned_clo: 'CLO3',
+      faculty_name: 'Dr. Hasan',
       verdict: 'warning',
       flags: [
         {
@@ -681,6 +731,16 @@ export const MOCK_EXAM_MODERATION = {
             'Estimated 18-22 minutes of work for 2.8% of the paper total — the mark-per-minute ratio is the worst on the paper.',
         },
       ],
+      strength_score: 52,
+      strength_rating: 'Needs Revision',
+      strength_metrics: {
+        originality: 95,
+        cognitive_rigor: 95,
+        mark_feasibility: 35,
+        clarity: 85,
+      },
+      strength_feedback:
+        'Mark allocation mismatch (Score: 52/100): Demands 18-22 minutes of Bernoulli trial proof for only 2 marks (2.8% of paper weight). Mark-to-effort ratio is severely compressed.',
     },
     {
       q_number: '6',
@@ -688,8 +748,20 @@ export const MOCK_EXAM_MODERATION = {
       marks: 12,
       assigned_bloom_level: 'C3',
       detected_bloom_level: 'C3',
+      assigned_clo: 'CLO2',
+      faculty_name: 'Dr. Hasan',
       verdict: 'pass',
       flags: [],
+      strength_score: 82,
+      strength_rating: 'Strong',
+      strength_metrics: {
+        originality: 92,
+        cognitive_rigor: 75,
+        mark_feasibility: 95,
+        clarity: 90,
+      },
+      strength_feedback:
+        'High-quality binary tree structure evaluation (Score: 82/100). Clear parameter constraints across 15 sequential keys.',
     },
     {
       q_number: '7',
@@ -697,8 +769,20 @@ export const MOCK_EXAM_MODERATION = {
       marks: 10,
       assigned_bloom_level: 'C4',
       detected_bloom_level: 'C4',
+      assigned_clo: 'CLO2',
+      faculty_name: 'Dr. Hasan',
       verdict: 'pass',
       flags: [],
+      strength_score: 89,
+      strength_rating: 'Strong',
+      strength_metrics: {
+        originality: 95,
+        cognitive_rigor: 85,
+        mark_feasibility: 95,
+        clarity: 95,
+      },
+      strength_feedback:
+        'Rigorous C4 analytical deconstruction (Score: 89/100). Tests deep algorithmic understanding of in-order successor pointer swapping.',
     },
     {
       q_number: '8',
@@ -706,8 +790,20 @@ export const MOCK_EXAM_MODERATION = {
       marks: 10,
       assigned_bloom_level: 'C4',
       detected_bloom_level: 'C4',
+      assigned_clo: 'CLO1',
+      faculty_name: 'Dr. Hasan',
       verdict: 'pass',
       flags: [],
+      strength_score: 91,
+      strength_rating: 'Strong',
+      strength_metrics: {
+        originality: 95,
+        cognitive_rigor: 85,
+        mark_feasibility: 95,
+        clarity: 95,
+      },
+      strength_feedback:
+        'Exemplary comparative analysis (Score: 91/100). Evaluates cache locality and dense matrix scalability with realistic V > 10,000 engineering context.',
     },
   ],
   duplicates: [
@@ -726,8 +822,118 @@ export const MOCK_EXAM_MODERATION = {
     higher_order_pct: 41.7,
     verdict: 'warning',
   },
+  obe_coverage: {
+    compliance_score: 58,
+    verdict: 'Non-Compliant',
+    all_clos_covered: false,
+    missing_clos: ['CLO4'],
+    higher_order_pct: 41.7,
+    has_c5_c6: false,
+    clo_distribution: {
+      CLO1: {
+        clo: 'CLO1',
+        description: 'Foundational Knowledge & Core Principles',
+        marks: 20.0,
+        percentage: 27.8,
+        question_count: 2,
+        status: 'balanced',
+      },
+      CLO2: {
+        clo: 'CLO2',
+        description: 'Algorithm Design & Data Structure Implementation',
+        marks: 40.0,
+        percentage: 55.6,
+        question_count: 4,
+        status: 'balanced',
+      },
+      CLO3: {
+        clo: 'CLO3',
+        description: 'Analytical Modeling, Proof & Performance Evaluation',
+        marks: 12.0,
+        percentage: 16.6,
+        question_count: 2,
+        status: 'balanced',
+      },
+      CLO4: {
+        clo: 'CLO4',
+        description: 'Synthesis, Engineering Design & Complex Problem Solving',
+        marks: 0.0,
+        percentage: 0.0,
+        question_count: 0,
+        status: 'unassessed',
+      },
+    },
+    checks: [
+      {
+        id: 'clo_coverage',
+        label: 'Full Course Learning Outcome (CLO) Coverage',
+        status: 'critical',
+        message:
+          'Target CLO4 has 0 marks allocated. OBE requires all course outcomes to be assessed.',
+      },
+      {
+        id: 'hots_threshold',
+        label: 'Higher-Order Thinking Skills (HOTS C4–C6 >= 35%)',
+        status: 'pass',
+        message:
+          'Higher-order cognitive outcomes represent 41.7% of the paper marks (Target: >= 35%).',
+      },
+      {
+        id: 'complex_problem_solving',
+        label: 'Complex Computational Problem Solving (C5/C6 Presence)',
+        status: 'warning',
+        message:
+          'Zero questions reach C5 (Evaluate) or C6 (Create). Departmental accreditation requires evidence of complex problem solving.',
+      },
+      {
+        id: 'constructive_alignment',
+        label: 'Constructive Alignment & Bloom Authenticity',
+        status: 'warning',
+        message:
+          '1 question (Q2a) suffers from cognitive verb mismatch, inflating declared analytical weight.',
+      },
+      {
+        id: 'historical_uniqueness',
+        label: 'Originality & Exam Security (No Past Paper Leakage)',
+        status: 'critical',
+        message:
+          '1 question (Q4) duplicates Fall 2024 Final (97% overlap), compromising exam security.',
+      },
+    ],
+    recommendations: [
+      'Introduce at least one question evaluating CLO4 (Synthesis, Engineering Design & Complex Problem Solving).',
+      'Add an analytical critique (C5) or system design/synthesis (C6) question to fulfill complex engineering problem criteria.',
+      'Rewrite Q4 with altered parameters and topologies so circulating Fall 2024 solutions cannot be recalled.',
+      'Re-tag Q2(a) to C1 or rewrite action verbs to require analytical derivation instead of state/list recall.',
+    ],
+  },
+  multi_faculty_summary: {
+    faculty_count: 2,
+    faculty_breakdown: [
+      {
+        faculty_name: 'Prof. Monir',
+        question_numbers: ['1', '2(a)', '3', '4'],
+        question_count: 4,
+        total_marks: 38.0,
+        marks_share_pct: 52.8,
+        avg_strength_score: 57.3,
+        clos_covered: ['CLO1', 'CLO2', 'CLO3'],
+        bloom_distribution: { C2: 1, C4: 1, C3: 2 },
+      },
+      {
+        faculty_name: 'Dr. Hasan',
+        question_numbers: ['5(b)', '6', '7', '8'],
+        question_count: 4,
+        total_marks: 34.0,
+        marks_share_pct: 47.2,
+        avg_strength_score: 78.5,
+        clos_covered: ['CLO3', 'CLO2', 'CLO1'],
+        bloom_distribution: { C4: 3, C3: 1 },
+      },
+    ],
+  },
   ai_summary:
-    'The Fall 2025 draft Final is not ready for approval. Question marks sum to 72 against a declared total of 70, so every script would be graded on an inconsistent denominator. Q4 is a 0.97 verbatim match against the Fall 2024 Final, a paper students already hold. Q2(a) asks students to "state" and "list" — pure C1 recall — while carrying a C4 tag, inflating the paper apparent analytical weight by 8 marks. Q5(b) allocates 2 marks to a derive-and-prove task worth an estimated 20 minutes. Cognitive balance is 58.3% lower-order to 41.7% higher-order, with no C5 or C6 question anywhere on the paper, so the highest-order CLOs go unassessed this semester.',
+    'The Fall 2025 draft Final is not ready for approval. Question marks sum to 72 against a declared total of 70, so every script would be graded on an inconsistent denominator. Q4 is a 0.97 verbatim match against the Fall 2024 Final, a paper students already hold. Q2(a) asks students to "state" and "list" — pure C1 recall — while carrying a C4 tag, inflating the paper apparent analytical weight by 8 marks. Q5(b) allocates 2 marks to a derive-and-prove task worth an estimated 20 minutes. OBE Audit flags that CLO4 is completely unassessed (0% coverage), and no questions assess C5 or C6 complex problem solving.',
 };
 
 /* ==========================================================================

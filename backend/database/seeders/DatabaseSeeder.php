@@ -248,6 +248,7 @@ MD;
                 'marks' => 10.0,
                 'assigned_bloom_level' => 'C2',
                 'assigned_clo' => 'CLO1',
+                'faculty_name' => 'Prof. Monir',
             ],
             [
                 // ERROR: Verb "State the definition" is C1 recall, but tagged C4 Analysis!
@@ -256,6 +257,7 @@ MD;
                 'marks' => 8.0,
                 'assigned_bloom_level' => 'C4', // PLANTED VERB MISMATCH
                 'assigned_clo' => 'CLO2',
+                'faculty_name' => 'Prof. Monir',
             ],
             [
                 'q_number' => '3',
@@ -263,6 +265,7 @@ MD;
                 'marks' => 10.0,
                 'assigned_bloom_level' => 'C3',
                 'assigned_clo' => 'CLO2',
+                'faculty_name' => 'Prof. Monir',
             ],
             [
                 // ERROR: ~90% textually identical to Fall 2024 Q4!
@@ -271,6 +274,7 @@ MD;
                 'marks' => 10.0, // PLANTED DUPLICATE
                 'assigned_bloom_level' => 'C3',
                 'assigned_clo' => 'CLO3',
+                'faculty_name' => 'Prof. Monir',
             ],
             [
                 // ERROR: Unfeasible workload for only 2 marks!
@@ -279,6 +283,7 @@ MD;
                 'marks' => 2.0, // PLANTED UNFEASIBLE MARKS
                 'assigned_bloom_level' => 'C4',
                 'assigned_clo' => 'CLO3',
+                'faculty_name' => 'Dr. Hasan',
             ],
             [
                 'q_number' => '6',
@@ -286,6 +291,7 @@ MD;
                 'marks' => 12.0,
                 'assigned_bloom_level' => 'C3',
                 'assigned_clo' => 'CLO2',
+                'faculty_name' => 'Dr. Hasan',
             ],
             [
                 'q_number' => '7',
@@ -293,6 +299,7 @@ MD;
                 'marks' => 10.0,
                 'assigned_bloom_level' => 'C4',
                 'assigned_clo' => 'CLO2',
+                'faculty_name' => 'Dr. Hasan',
             ],
             [
                 'q_number' => '8',
@@ -300,6 +307,7 @@ MD;
                 'marks' => 10.0,
                 'assigned_bloom_level' => 'C4',
                 'assigned_clo' => 'CLO1',
+                'faculty_name' => 'Dr. Hasan',
             ],
         ];
         // Total marks sum: 10 + 8 + 10 + 10 + 2 + 12 + 10 + 10 = 72 marks (Declared: 70)
@@ -314,6 +322,7 @@ MD;
                 'marks' => $q['marks'],
                 'assigned_bloom_level' => $q['assigned_bloom_level'],
                 'assigned_clo' => $q['assigned_clo'],
+                'faculty_name' => $q['faculty_name'] ?? null,
                 'is_past_paper' => false,
             ]);
         }

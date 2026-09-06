@@ -9,8 +9,19 @@
             "marks": 10,
             "assigned_bloom_level": "C2",
             "detected_bloom_level": "C1",
+            "assigned_clo": "CLO1",
+            "faculty_name": "Prof. Monir",
             "verdict": "pass",
-            "flags": []
+            "flags": [],
+            "strength_score": 85,
+            "strength_rating": "Strong",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 50,
+                "mark_feasibility": 95,
+                "clarity": 95
+            },
+            "strength_feedback": "Cognitive alignment defect: Tagged C2 but action verbs test C1 capability. Cognitive overstatement reduces the exam's power to assess higher-order thinking."
         },
         {
             "q_number": "2(a)",
@@ -18,13 +29,24 @@
             "marks": 8,
             "assigned_bloom_level": "C4",
             "detected_bloom_level": "C1",
+            "assigned_clo": "CLO2",
+            "faculty_name": "Prof. Monir",
             "verdict": "critical",
             "flags": [
                 {
                     "type": "verb_mismatch",
                     "message": "Question is tagged C4 but action verbs assess C1 capability. Cognitive overstatement of 3 levels."
                 }
-            ]
+            ],
+            "strength_score": 70,
+            "strength_rating": "Moderate",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 35,
+                "mark_feasibility": 95,
+                "clarity": 90
+            },
+            "strength_feedback": "Cognitive alignment defect: Tagged C4 but action verbs test C1 capability. Cognitive overstatement reduces the exam's power to assess higher-order thinking."
         },
         {
             "q_number": "3",
@@ -32,8 +54,19 @@
             "marks": 10,
             "assigned_bloom_level": "C3",
             "detected_bloom_level": "C3",
+            "assigned_clo": "CLO2",
+            "faculty_name": "Prof. Monir",
             "verdict": "pass",
-            "flags": []
+            "flags": [],
+            "strength_score": 100,
+            "strength_rating": "Strong",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 75,
+                "mark_feasibility": 95,
+                "clarity": 90
+            },
+            "strength_feedback": "Solid application question (Score: 100/100). Distinct from past paper archives with clear problem constraints and appropriate mark allocation."
         },
         {
             "q_number": "4",
@@ -41,6 +74,8 @@
             "marks": 10,
             "assigned_bloom_level": "C3",
             "detected_bloom_level": "C1",
+            "assigned_clo": "CLO3",
+            "faculty_name": "Prof. Monir",
             "verdict": "critical",
             "flags": [
                 {
@@ -51,7 +86,16 @@
                     "type": "verb_mismatch",
                     "message": "Question is tagged C3 but action verbs assess C1 capability. Cognitive overstatement of 2 levels."
                 }
-            ]
+            ],
+            "strength_score": 40,
+            "strength_rating": "Needs Revision",
+            "strength_metrics": {
+                "originality": 10,
+                "cognitive_rigor": 40,
+                "mark_feasibility": 95,
+                "clarity": 95
+            },
+            "strength_feedback": "Originality risk: High textual overlap (100%) against Fall 2024 Final question. The problem parameters and structure circulate in past student papers. Recommend changing constraints or graph topology to evaluate transfer rather than recall."
         },
         {
             "q_number": "5(b)",
@@ -59,6 +103,8 @@
             "marks": 2,
             "assigned_bloom_level": "C4",
             "detected_bloom_level": "C5",
+            "assigned_clo": "CLO3",
+            "faculty_name": "Dr. Hasan",
             "verdict": "warning",
             "flags": [
                 {
@@ -69,7 +115,16 @@
                     "type": "time_budget",
                     "message": "Estimated 18-22 minutes required for 2.8% of paper mark weight. Mark-per-minute allocation is severely compressed."
                 }
-            ]
+            ],
+            "strength_score": 80,
+            "strength_rating": "Strong",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 95,
+                "mark_feasibility": 35,
+                "clarity": 90
+            },
+            "strength_feedback": "Mark allocation imbalance: Workload requires proof/analytical derivation estimated at 18-22 minutes for only 2 marks. Recommend increasing mark weight or decomposing into smaller subparts."
         },
         {
             "q_number": "6",
@@ -77,8 +132,19 @@
             "marks": 12,
             "assigned_bloom_level": "C3",
             "detected_bloom_level": "C3",
+            "assigned_clo": "CLO2",
+            "faculty_name": "Dr. Hasan",
             "verdict": "pass",
-            "flags": []
+            "flags": [],
+            "strength_score": 100,
+            "strength_rating": "Strong",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 75,
+                "mark_feasibility": 95,
+                "clarity": 90
+            },
+            "strength_feedback": "Solid application question (Score: 100/100). Distinct from past paper archives with clear problem constraints and appropriate mark allocation."
         },
         {
             "q_number": "7",
@@ -86,8 +152,19 @@
             "marks": 10,
             "assigned_bloom_level": "C4",
             "detected_bloom_level": "C4",
+            "assigned_clo": "CLO2",
+            "faculty_name": "Dr. Hasan",
             "verdict": "pass",
-            "flags": []
+            "flags": [],
+            "strength_score": 100,
+            "strength_rating": "Strong",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 85,
+                "mark_feasibility": 95,
+                "clarity": 90
+            },
+            "strength_feedback": "Solid application question (Score: 100/100). Distinct from past paper archives with clear problem constraints and appropriate mark allocation."
         },
         {
             "q_number": "8",
@@ -95,13 +172,24 @@
             "marks": 10,
             "assigned_bloom_level": "C4",
             "detected_bloom_level": "C1",
+            "assigned_clo": "CLO1",
+            "faculty_name": "Dr. Hasan",
             "verdict": "critical",
             "flags": [
                 {
                     "type": "verb_mismatch",
                     "message": "Question is tagged C4 but action verbs assess C1 capability. Cognitive overstatement of 3 levels."
                 }
-            ]
+            ],
+            "strength_score": 70,
+            "strength_rating": "Moderate",
+            "strength_metrics": {
+                "originality": 95,
+                "cognitive_rigor": 35,
+                "mark_feasibility": 95,
+                "clarity": 95
+            },
+            "strength_feedback": "Cognitive alignment defect: Tagged C4 but action verbs test C1 capability. Cognitive overstatement reduces the exam's power to assess higher-order thinking."
         }
     ],
     "duplicates": [
@@ -118,5 +206,137 @@
         "higher_order_pct": 41.7,
         "verdict": "warning"
     },
-    "ai_summary": "The Fall 2025 draft Final is not ready for approval. Question marks sum to 72 against a declared total of 70, so every script would be graded on an inconsistent denominator. Q4 is a 0.97 verbatim match against the Fall 2024 Final, a paper students already hold. Q2(a) asks students to \"state\" and \"list\" — pure C1 recall — while carrying a C4 tag, inflating the paper apparent analytical weight by 8 marks. Q5(b) allocates 2 marks to a derive-and-prove task worth an estimated 20 minutes. Cognitive balance is 58.3% lower-order to 41.7% higher-order, with no C5 or C6 question anywhere on the paper, so the highest-order CLOs go unassessed this semester."
+    "obe_coverage": {
+        "compliance_score": 53,
+        "verdict": "Non-Compliant",
+        "all_clos_covered": false,
+        "missing_clos": [
+            "CLO4"
+        ],
+        "higher_order_pct": 41.7,
+        "has_c5_c6": false,
+        "clo_distribution": {
+            "CLO1": {
+                "clo": "CLO1",
+                "description": "Foundational Knowledge & Core Principles",
+                "marks": 20,
+                "percentage": 27.8,
+                "question_count": 2,
+                "status": "balanced"
+            },
+            "CLO2": {
+                "clo": "CLO2",
+                "description": "Algorithm Design & Data Structure Implementation",
+                "marks": 40,
+                "percentage": 55.6,
+                "question_count": 4,
+                "status": "balanced"
+            },
+            "CLO3": {
+                "clo": "CLO3",
+                "description": "Analytical Modeling, Proof & Performance Evaluation",
+                "marks": 12,
+                "percentage": 16.7,
+                "question_count": 2,
+                "status": "balanced"
+            },
+            "CLO4": {
+                "clo": "CLO4",
+                "description": "Synthesis, Engineering Design & Complex Problem Solving",
+                "marks": 0,
+                "percentage": 0,
+                "question_count": 0,
+                "status": "unassessed"
+            }
+        },
+        "checks": [
+            {
+                "id": "clo_coverage",
+                "label": "Full Course Learning Outcome (CLO) Coverage",
+                "status": "critical",
+                "message": "Target CLO4 has 0 marks allocated. OBE requires all course outcomes to be verified."
+            },
+            {
+                "id": "hots_threshold",
+                "label": "Higher-Order Thinking Skills (HOTS C4–C6 >= 35%)",
+                "status": "pass",
+                "message": "Higher-order cognitive outcomes represent 41.7% of the paper marks (Target: >= 35%)."
+            },
+            {
+                "id": "complex_problem_solving",
+                "label": "Complex Computational Problem Solving (C5/C6 Presence)",
+                "status": "warning",
+                "message": "Zero questions reach C5 (Evaluate) or C6 (Create). Graduation attributes require evidence of complex design capability."
+            },
+            {
+                "id": "constructive_alignment",
+                "label": "Constructive Alignment & Bloom Authenticity",
+                "status": "warning",
+                "message": "5 question(s) suffer from cognitive verb mismatch, inflating declared cognitive weight."
+            },
+            {
+                "id": "historical_uniqueness",
+                "label": "Originality & Exam Security (No Past Paper Leakage)",
+                "status": "critical",
+                "message": "1 question(s) duplicate circulating past papers, compromising assessment validity."
+            }
+        ],
+        "recommendations": [
+            "Introduce at least one question evaluating CLO4 (Synthesis, Engineering Design & Complex Problem Solving) to ensure complete learning outcome coverage.",
+            "Add an analytical critique (C5) or system design/synthesis (C6) question to fulfill complex engineering problem criteria.",
+            "Rewrite flagged duplicate questions with altered parameters and topologies so circulating past papers cannot be recalled.",
+            "Align question action verbs with tagged Bloom levels, or adjust tagging down to match the actual cognitive demand."
+        ]
+    },
+    "multi_faculty_summary": {
+        "faculty_count": 2,
+        "faculty_breakdown": [
+            {
+                "faculty_name": "Prof. Monir",
+                "question_numbers": [
+                    "1",
+                    "2(a)",
+                    "3",
+                    "4"
+                ],
+                "question_count": 4,
+                "total_marks": 38,
+                "marks_share_pct": 52.8,
+                "avg_strength_score": 73.8,
+                "clos_covered": [
+                    "CLO1",
+                    "CLO2",
+                    "CLO3"
+                ],
+                "bloom_distribution": {
+                    "C2": 1,
+                    "C4": 1,
+                    "C3": 2
+                }
+            },
+            {
+                "faculty_name": "Dr. Hasan",
+                "question_numbers": [
+                    "5(b)",
+                    "6",
+                    "7",
+                    "8"
+                ],
+                "question_count": 4,
+                "total_marks": 34,
+                "marks_share_pct": 47.2,
+                "avg_strength_score": 87.5,
+                "clos_covered": [
+                    "CLO3",
+                    "CLO2",
+                    "CLO1"
+                ],
+                "bloom_distribution": {
+                    "C4": 3,
+                    "C3": 1
+                }
+            }
+        ]
+    },
+    "ai_summary": "Moderation flagged 3 issue group(s): the question marks sum to 72 against a declared total of 70; 1 question(s) repeat a past paper (Q4); 5 question(s) are labelled at a cognitive level the wording does not support. Cognitive balance is 58.3% lower-order against 41.7% higher-order (warning)."
 }
