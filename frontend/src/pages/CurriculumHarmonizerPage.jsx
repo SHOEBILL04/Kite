@@ -1170,7 +1170,12 @@ export default function CurriculumHarmonizerPage() {
   const report = auditMutation.data;
   const isFetching = auditMutation.isPending || uploading;
 
-  const canRun = Boolean(customCourseA?.syllabus_markdown && customCourseB?.syllabus_markdown) && !isFetching;
+  const isSameFile = useMemo(() => {
+    if (!customCourseA?.syllabus_markdown || !customCourseB?.syllabus_markdown) return false;
+    return customCourseA.syllabus_markdown.trim() === customCourseB.syllabus_markdown.trim();
+  }, [customCourseA, customCourseB]);
+
+  const canRun = Boolean(customCourseA?.syllabus_markdown && customCourseB?.syllabus_markdown) && !isSameFile && !isFetching;
 
   const loadSamplePair = async () => {
     setLoadError(null);
@@ -1214,6 +1219,12 @@ export default function CurriculumHarmonizerPage() {
     reader.onload = (e) => {
       const content = e.target?.result;
       if (typeof content !== 'string') return;
+
+      if (customCourseB?.syllabus_markdown && content.trim() === customCourseB.syllabus_markdown.trim()) {
+        setLoadError('Validation Error: The same file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different curriculum files.');
+        return;
+      }
+
       const code = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
       const newA = { code, title: file.name, syllabus_markdown: content };
       setCustomCourseA(newA);
@@ -1240,6 +1251,12 @@ export default function CurriculumHarmonizerPage() {
     reader.onload = (e) => {
       const content = e.target?.result;
       if (typeof content !== 'string') return;
+
+      if (customCourseA?.syllabus_markdown && content.trim() === customCourseA.syllabus_markdown.trim()) {
+        setLoadError('Validation Error: The same file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different curriculum files.');
+        return;
+      }
+
       const code = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
       const newB = { code, title: file.name, syllabus_markdown: content };
       setCustomCourseB(newB);
@@ -1263,7 +1280,7 @@ export default function CurriculumHarmonizerPage() {
     const tempB = customCourseB;
     setCustomCourseA(tempB);
     setCustomCourseB(tempA);
-    if (tempA && tempB) {
+    if (tempA && tempB && tempA.syllabus_markdown.trim() !== tempB.syllabus_markdown.trim()) {
       auditMutation.mutate({
         syllabus_a_markdown: tempB.syllabus_markdown,
         syllabus_b_markdown: tempA.syllabus_markdown,
@@ -1459,7 +1476,16 @@ export default function CurriculumHarmonizerPage() {
                 </Button>
               </div>
 
-              {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
+              {isSameFile ? (
+                <div className="flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                  <span>
+                    Validation Error: The same curriculum file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different course curriculum files.
+                  </span>
+                </div>
+              ) : null}
+
+              {loadError ? <p className="text-[11px] text-rose-300 font-medium">{loadError}</p> : null}
             </CardBody>
           </Card>
 
