@@ -153,6 +153,36 @@ class AuditEnginesTest extends TestCase
         $this->assertNotEmpty($data['ai_summary']);
     }
 
+    public function test_cross_audit_new_course_against_catalog_with_groq(): void
+    {
+        $proposedSyllabus = file_get_contents(storage_path('app/samples/curriculum_proposed_cse3105_machine_learning.md'));
+
+        $response = $this->postJson('/api/audit/syllabus/cross-audit', [
+            'syllabus_markdown' => $proposedSyllabus,
+            'code' => 'CSE 3105',
+            'title' => 'Machine Learning & Data Analytics',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'proposed_course',
+                    'most_matched_course',
+                    'catalog_matches',
+                    'novel_topics',
+                    'novel_topics_count',
+                    'bloom_coverage',
+                    'ai_summary',
+                ],
+            ]);
+
+        $data = $response->json('data');
+        $this->assertEquals('CSE 3105', $data['proposed_course']['code']);
+        $this->assertNotEmpty($data['most_matched_course']['course_code']);
+        $this->assertGreaterThan(0, $data['novel_topics_count']);
+        $this->assertNotEmpty($data['ai_summary']);
+    }
+
     public function test_exam_moderator_flags_mark_sum_and_jaccard_duplicates(): void
     {
         $response = $this->postJson('/api/audit/exam-moderation', [
