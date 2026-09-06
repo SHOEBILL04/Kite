@@ -1388,7 +1388,7 @@ export default function CurriculumHarmonizerPage() {
                     download="curriculum_cse2101_data_structures.md"
                     className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
                   >
-                    <Download className="h-3 w-3" /> Curriculum A (.md)
+                    <Download className="h-3 w-3" /> Data Structures (.md)
                   </a>
                   <span className="text-slate-600">·</span>
                   <a
@@ -1396,7 +1396,39 @@ export default function CurriculumHarmonizerPage() {
                     download="curriculum_cse2103_algorithms.md"
                     className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
                   >
-                    <Download className="h-3 w-3" /> Curriculum B (.md)
+                    <Download className="h-3 w-3" /> Algorithms (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse3101_database_systems.md"
+                    download="curriculum_cse3101_database_systems.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> DBMS (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse3103_operating_systems.md"
+                    download="curriculum_cse3103_operating_systems.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> OS (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse4101_computer_networks.md"
+                    download="curriculum_cse4101_computer_networks.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> Networks (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse4103_artificial_intelligence.md"
+                    download="curriculum_cse4103_artificial_intelligence.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> AI (.md)
                   </a>
                   {activeCohortTitle ? (
                     <>
