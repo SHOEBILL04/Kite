@@ -510,5 +510,11 @@ MD;
                 'attendance_pct' => $item['att'],
             ]);
         }
+
+        // Everything above is the scripted CSE 2101 demo. This fills in the
+        // courses, papers, cohorts and report history the other modules would
+        // otherwise open onto an empty table. It runs last, after the
+        // truncations above, and only ever adds rows.
+        $this->call(DemoDataSeeder::class);
     }
 }
