@@ -29,6 +29,22 @@ export const ROLES = ['faculty', 'head_of_department', 'moderator'];
 export const AUDIT_MODULES = ['grading', 'syllabus', 'exam', 'student_risk'];
 export const BLOOM_LEVELS = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
 
+/** Lifecycle of a grading batch. */
+export const GRADING_BATCH_STATUS = ['collecting', 'ready', 'audited'];
+
+/** Human labels for `status` on a grading batch. */
+export const GRADING_BATCH_STATUS_LABELS = {
+  collecting: 'Collecting',
+  ready: 'Ready',
+  audited: 'Audited',
+};
+
+/** Columns every uploaded marks CSV must contain, in template order. */
+export const MARKS_CSV_COLUMNS = ['student_id', 'mid_marks', 'quiz_avg', 'attendance_pct'];
+
+/** A parity audit compares sections, so it needs at least this many. */
+export const MIN_SECTIONS_FOR_PARITY = 2;
+
 /** Human labels for the role badge in the top bar. */
 export const ROLE_LABELS = {
   faculty: 'Faculty',
@@ -83,7 +99,14 @@ export const ENDPOINTS = {
   examQuestions: (examId) => `/exams/${examId}/questions`,
 
   // --- Audits -----------------------------------------------------------
-  /** POST — body `{ course_id: number }` -> {@link GradingDriftReport} */
+  /**
+   * POST -> {@link GradingDriftReport}
+   *
+   * Body `{ grading_batch_id: number }`. `{ course_id: number }` still works
+   * and resolves to that course's most recent batch with enough sections.
+   * Rejects with 422 and `{ sections_submitted, sections_required }` when
+   * fewer than {@link MIN_SECTIONS_FOR_PARITY} sections have uploaded.
+   */
   auditGradingDrift: '/audit/grading-drift',
   /** POST — body `{ course_a_id: number, course_b_id: number }` -> {@link SyllabusReport} */
   auditSyllabus: '/audit/syllabus',
@@ -93,6 +116,51 @@ export const ENDPOINTS = {
   auditExamModeration: '/audit/exam-moderation',
   /** POST — body `{ course_id: number }` -> {@link VulnerableStudentsReport} */
   auditVulnerableStudents: '/audit/vulnerable-students',
+
+  // --- Grading batches (multi-teacher mark upload) ----------------------
+  /**
+   * GET -> {@link GradingBatch}[]
+   *
+   * Faculty receive only batches for courses they teach, with `my_submission`
+   * populated and `submissions` empty. Heads of department receive every batch
+   * with the full `submissions` list.
+   */
+  gradingBatches: '/grading-batches',
+  /** POST — body {@link CreateGradingBatchPayload} -> {@link GradingBatch} (201). HoD only. */
+  createGradingBatch: '/grading-batches',
+  /**
+   * POST — multipart `{ file: File, section_name: string }` -> {@link UploadMarksResult}
+   *
+   * Rejects with 422 and {@link MarksUploadError} when the file fails
+   * validation. Nothing is imported on failure.
+   *
+   * @param {number} batchId
+   * @returns {string}
+   */
+  uploadMarks: (batchId) => `/grading-batches/${batchId}/upload`,
+  /**
+   * GET -> a CSV download with the correct headers and three example rows.
+   *
+   * @param {number} batchId
+   * @returns {string}
+   */
+  gradingTemplate: (batchId) => `/grading-batches/${batchId}/template`,
+  /**
+   * GET -> {@link MySectionStats} — the requesting faculty's own section only.
+   *
+   * @param {number} batchId
+   * @returns {string}
+   */
+  myGradingStats: (batchId) => `/grading-batches/${batchId}/my-stats`,
+  /**
+   * DELETE -> `{ deleted: true, batch_status: GradingBatchStatus, sections_submitted: number, total_sections: number }`
+   *
+   * @param {number} batchId
+   * @param {number} submissionId
+   * @returns {string}
+   */
+  deleteGradingSubmission: (batchId, submissionId) =>
+    `/grading-batches/${batchId}/submissions/${submissionId}`,
 
   // --- Reports ----------------------------------------------------------
   /**
@@ -131,6 +199,11 @@ export const QUERY_KEYS = {
   examModeration: (examId) => ['audit', 'exam-moderation', examId],
   /** @param {number} courseId */
   vulnerableStudents: (courseId) => ['audit', 'vulnerable-students', courseId],
+  gradingBatches: ['grading-batches'],
+  /** @param {number} batchId */
+  myGradingStats: (batchId) => ['grading-batches', batchId, 'my-stats'],
+  /** @param {number} batchId */
+  gradingDriftBatch: (batchId) => ['audit', 'grading-drift', 'batch', batchId],
 };
 
 /* ==========================================================================
@@ -260,6 +333,9 @@ export const QUERY_KEYS = {
  * @property {number} z_score        section mean vs cohort mean, in cohort SDs
  * @property {number} leniency_index 1.0 = cohort norm; >1 lenient, <1 harsh
  * @property {DistributionBucket[]} distribution  histogram, ordered low -> high
+ * @property {string} [uploaded_by]   faculty who uploaded this section's marks
+ * @property {string|null} [uploaded_at]  ISO 8601; null for pre-batch data
+ * @property {string|null} [file_name]    the uploaded file's original name
  */
 
 /**
@@ -270,6 +346,20 @@ export const QUERY_KEYS = {
  */
 
 /**
+/**
+ * @typedef {Object} GradingDriftBatchContext
+ * @property {number} id
+ * @property {number} course_id
+ * @property {string} course_code
+ * @property {string} course_title
+ * @property {string} semester
+ * @property {string} assessment_name
+ * @property {number} max_marks
+ * @property {GradingBatchStatus} status
+ * @property {number} sections_submitted
+ */
+
+/**
  * @typedef {Object} Normalization
  * @property {string} section_name     section the shift applies to
  * @property {number} suggested_shift  marks to add (+) or subtract (-)
@@ -277,13 +367,124 @@ export const QUERY_KEYS = {
  */
 
 /**
+ * The `batch` field is null only for pre-batch data that predates the upload
+ * workflow; every audit run against an uploaded batch carries it.
+ *
  * @typedef {Object} GradingDriftReport
+ * @property {GradingDriftBatchContext|null} batch
  * @property {boolean} drift_detected
  * @property {Severity} severity
  * @property {SectionStat[]} section_stats
  * @property {Insight[]} insights
  * @property {Normalization} normalization
  * @property {string} ai_summary
+ */
+
+
+/* ==========================================================================
+ * GRADING BATCHES  —  multi-teacher mark upload
+ *
+ * A batch is the shared unit two or more teachers upload into. A parity audit
+ * runs on a batch rather than a course, because comparing sections only means
+ * something when they sat the same assessment out of the same total.
+ * ======================================================================= */
+
+/**
+ * @typedef {'collecting'|'ready'|'audited'} GradingBatchStatus
+ *   collecting — fewer than two sections in
+ *   ready      — enough sections to audit
+ *   audited    — a parity audit has been run against this batch
+ */
+
+/**
+ * One faculty member's upload of one section's marks.
+ *
+ * @typedef {Object} GradingSubmission
+ * @property {number} id
+ * @property {number} grading_batch_id
+ * @property {string} section_name      e.g. "Section A"
+ * @property {number} faculty_id
+ * @property {string} faculty_name      e.g. "Prof. Monir"
+ * @property {number} student_count     rows accepted from the file
+ * @property {string} file_name         the uploaded file's original name
+ * @property {string} uploaded_at       ISO 8601
+ */
+
+/**
+ * @typedef {Object} GradingBatch
+ * @property {number} id
+ * @property {number} course_id
+ * @property {string} course_code
+ * @property {string} course_title
+ * @property {string} semester
+ * @property {string} assessment_name       e.g. "Mid Term"
+ * @property {number} max_marks
+ * @property {GradingBatchStatus} status
+ * @property {number} created_by
+ * @property {string} created_by_name
+ * @property {number} sections_submitted
+ * @property {number} total_sections        expected sections, floor of 2
+ * @property {GradingSubmission|null} my_submission   null until the viewer uploads
+ * @property {GradingSubmission[]} submissions        HoD only; empty for faculty
+ * @property {string} created_at
+ * @property {string} updated_at
+ */
+
+/**
+ * @typedef {Object} CreateGradingBatchPayload
+ * @property {number} course_id
+ * @property {string} semester
+ * @property {string} assessment_name
+ * @property {number} max_marks
+ */
+
+/**
+ * @typedef {Object} UploadMarksResult
+ * @property {GradingSubmission} submission
+ * @property {GradingBatchStatus} batch_status
+ * @property {number} sections_submitted
+ * @property {number} total_sections
+ * @property {boolean} replaced   true when this overwrote a previous upload
+ */
+
+/**
+ * One rejected cell. `row` is the spreadsheet row number (the header is row 1),
+ * and is null for whole-file problems such as "too few rows".
+ *
+ * @typedef {Object} MarksRowError
+ * @property {number|null} row
+ * @property {string|null} column
+ * @property {string|number|null} value
+ * @property {string} reason
+ */
+
+/**
+ * The 422 body when a marks file is rejected. Validation is all-or-nothing:
+ * when this comes back, nothing was imported.
+ *
+ * @typedef {Object} MarksUploadError
+ * @property {string} message
+ * @property {MarksRowError[]} row_errors   capped at 50
+ * @property {number} total_errors          full count, may exceed row_errors.length
+ * @property {number} total_rows
+ */
+
+/**
+ * A teacher's view of their own marking — no leniency index, no z-score, and
+ * no other section. Comparison is a department-level conversation.
+ *
+ * @typedef {Object} MySectionStats
+ * @property {number} batch_id
+ * @property {string} section_name
+ * @property {string} assessment_name
+ * @property {number} max_marks
+ * @property {number} n
+ * @property {number} mean
+ * @property {number} std_dev
+ * @property {number} min
+ * @property {number} max
+ * @property {DistributionBucket[]} distribution
+ * @property {string} uploaded_at
  */
 
 /* ==========================================================================

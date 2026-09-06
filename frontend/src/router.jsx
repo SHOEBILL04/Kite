@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import GradingParityPage from './pages/GradingParityPage.jsx';
+import GradingBatches from './pages/GradingBatches.jsx';
 import ExamModerationPage from './pages/ExamModerationPage.jsx';
 import CurriculumHarmonizerPage from './pages/CurriculumHarmonizerPage.jsx';
 import StudentRadarPage from './pages/StudentRadarPage.jsx';
@@ -97,6 +98,14 @@ export default function AppRoutes() {
           element={
             <RouteBoundary label="Dashboard">
               <DashboardPage />
+            </RouteBoundary>
+          }
+        />
+        <Route
+          path="/grading-batches"
+          element={
+            <RouteBoundary label="Mark Collection">
+              <GradingBatches />
             </RouteBoundary>
           }
         />

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
-  BookOpen,
   FileSearch,
   GitCompare,
   GraduationCap,
@@ -10,6 +9,7 @@ import {
   Radar,
   Scale,
   Shield,
+  Upload,
 } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
 import { initials } from '../../lib/format.js';
@@ -20,6 +20,7 @@ import { ApiStatus, Badge, Button } from '../ui/index.js';
 
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', title: 'Faculty Dashboard', icon: LayoutDashboard },
+  { to: '/grading-batches', label: 'Mark Collection', title: 'Mark Collection', icon: Upload },
   { to: '/grading-parity', label: 'Grading Parity', title: 'Grading Parity & Section Audit', icon: Scale },
   { to: '/exam-moderation', label: 'Exam Moderation', title: 'Exam Paper Moderation & Bloom Audit', icon: FileSearch },
   {
