@@ -1,17 +1,19 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeftRight,
   Check,
   ChevronDown,
   Copy,
+  Download,
   GitCompare,
   Layers,
   ListChecks,
   Play,
   RotateCw,
   ScanSearch,
+  Upload,
 } from 'lucide-react';
 import {
   Bar,
@@ -858,9 +860,16 @@ function LoadingResults() {
  * lines they came from, so a redundancy can be seen in both syllabi at once.
  */
 export default function CurriculumHarmonizerPage() {
+  const fileInputARef = useRef(null);
+  const fileInputBRef = useRef(null);
+
   const [pair, setPair] = useState({ a: null, b: null });
-  /** The pair the visible report belongs to — only "Run" moves this. */
   const [submitted, setSubmitted] = useState(null);
+  const [customCourseA, setCustomCourseA] = useState(null);
+  const [customCourseB, setCustomCourseB] = useState(null);
+  const [activeCohortTitle, setActiveCohortTitle] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const coursesQuery = useQuery({
     queryKey: QUERY_KEYS.courses,
@@ -877,12 +886,19 @@ export default function CurriculumHarmonizerPage() {
     retry: false,
   });
 
+  const auditMutation = useMutation({
+    mutationFn: (payload) => post(ENDPOINTS.auditSyllabus, payload),
+  });
+
   const byId = (id) => courses.find((course) => course.id === id) ?? null;
-  const submittedA = submitted ? byId(submitted.a) : null;
-  const submittedB = submitted ? byId(submitted.b) : null;
+  const submittedA = customCourseA ?? (submitted ? byId(submitted.a) : null);
+  const submittedB = customCourseB ?? (submitted ? byId(submitted.b) : null);
+
+  const report = auditMutation.data ?? auditQuery.data;
+  const isFetching = auditMutation.isPending || auditQuery.isFetching || uploading;
 
   const samePair = pair.a !== null && pair.a === pair.b;
-  const canRun = pair.a !== null && pair.b !== null && !samePair && !auditQuery.isFetching;
+  const canRun = pair.a !== null && pair.b !== null && !samePair && !isFetching;
 
   const loadDemoPair = () => {
     const a = courses.find((course) => course.code === DEMO_PAIR.a) ?? courses[0];
@@ -890,18 +906,102 @@ export default function CurriculumHarmonizerPage() {
     setPair({ a: a?.id ?? null, b: b?.id ?? null });
   };
 
-  const swap = () => setPair((current) => ({ a: current.b, b: current.a }));
+  const loadSamplePair = async () => {
+    setLoadError(null);
+    setUploading(true);
+    try {
+      const [resA, resB] = await Promise.all([
+        fetch('/samples/curriculum_cse2101_data_structures.md'),
+        fetch('/samples/curriculum_cse2103_algorithms.md'),
+      ]);
+      if (!resA.ok || !resB.ok) throw new Error('Could not fetch sample curricula.');
+      const [textA, textB] = await Promise.all([resA.text(), resB.text()]);
 
-  const report = auditQuery.data;
+      const cA = { code: 'CSE 2101', title: 'Data Structures (Sample)', syllabus_markdown: textA };
+      const cB = { code: 'CSE 2103', title: 'Algorithms (Sample)', syllabus_markdown: textB };
+      setCustomCourseA(cA);
+      setCustomCourseB(cB);
+      setActiveCohortTitle('Sample Pair: CSE 2101 → CSE 2103');
+
+      auditMutation.mutate({
+        syllabus_a_markdown: textA,
+        syllabus_b_markdown: textB,
+        course_a_code: 'CSE 2101',
+        course_b_code: 'CSE 2103',
+      });
+    } catch (err) {
+      setLoadError(err.message ?? 'Failed to load sample curricula.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileUploadA = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+      const code = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+      const newA = { code, title: file.name, syllabus_markdown: content };
+      setCustomCourseA(newA);
+      setActiveCohortTitle(`Uploaded Course A: ${file.name}`);
+
+      if (customCourseB?.syllabus_markdown) {
+        auditMutation.mutate({
+          syllabus_a_markdown: content,
+          syllabus_b_markdown: customCourseB.syllabus_markdown,
+          course_a_code: code,
+          course_b_code: customCourseB.code,
+        });
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const handleFileUploadB = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+      const code = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+      const newB = { code, title: file.name, syllabus_markdown: content };
+      setCustomCourseB(newB);
+      setActiveCohortTitle(`Uploaded Course B: ${file.name}`);
+
+      if (customCourseA?.syllabus_markdown) {
+        auditMutation.mutate({
+          syllabus_a_markdown: customCourseA.syllabus_markdown,
+          syllabus_b_markdown: content,
+          course_a_code: customCourseA.code,
+          course_b_code: code,
+        });
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const swap = () => setPair((current) => ({ a: current.b, b: current.a }));
 
   return (
     <div className="space-y-4">
+      {/* Hidden file inputs */}
+      <input type="file" ref={fileInputARef} onChange={handleFileUploadA} accept=".md,.txt" className="hidden" />
+      <input type="file" ref={fileInputBRef} onChange={handleFileUploadB} accept=".md,.txt" className="hidden" />
+
       {/* --- Top bar ------------------------------------------------------ */}
       <Card>
         <CardHeader
           icon={GitCompare}
-          title="Course pair"
-          subtitle="Audit a prerequisite course against the course that builds on it."
+          title="Curriculum Harmonizer"
+          subtitle="Audit a prerequisite course curriculum against the target course that builds on it to identify re-taught topics, missing prerequisites, and Bloom taxonomy coverage."
           action={
             <Button
               variant="ghost"
@@ -914,13 +1014,16 @@ export default function CurriculumHarmonizerPage() {
             </Button>
           }
         />
-        <CardBody>
+        <CardBody className="space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <CourseSelect
               id="course-a"
               label="Prerequisite Course"
               value={pair.a}
-              onChange={(id) => setPair((current) => ({ ...current, a: id }))}
+              onChange={(id) => {
+                setCustomCourseA(null);
+                setPair((current) => ({ ...current, a: id }));
+              }}
               courses={courses}
               disabled={coursesQuery.isPending}
             />
@@ -939,7 +1042,10 @@ export default function CurriculumHarmonizerPage() {
               id="course-b"
               label="Target Course"
               value={pair.b}
-              onChange={(id) => setPair((current) => ({ ...current, b: id }))}
+              onChange={(id) => {
+                setCustomCourseB(null);
+                setPair((current) => ({ ...current, b: id }));
+              }}
               courses={courses}
               disabled={coursesQuery.isPending}
             />
@@ -947,48 +1053,109 @@ export default function CurriculumHarmonizerPage() {
             <Button
               size="md"
               icon={Play}
-              loading={auditQuery.isFetching}
+              loading={isFetching}
               disabled={!canRun}
-              onClick={() => setSubmitted({ a: pair.a, b: pair.b })}
+              onClick={() => {
+                setCustomCourseA(null);
+                setCustomCourseB(null);
+                setActiveCohortTitle(null);
+                setSubmitted({ a: pair.a, b: pair.b });
+              }}
               className="shrink-0"
             >
               Run Harmonization Audit
             </Button>
           </div>
 
+          {/* Upload and Sample Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/60">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Upload}
+              onClick={() => fileInputARef.current?.click()}
+            >
+              {customCourseA ? `Curriculum A: ${customCourseA.code}` : 'Upload Curriculum A (.md / .txt)'}
+            </Button>
+
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Upload}
+              onClick={() => fileInputBRef.current?.click()}
+            >
+              {customCourseB ? `Curriculum B: ${customCourseB.code}` : 'Upload Curriculum B (.md / .txt)'}
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={GitCompare}
+              loading={uploading}
+              onClick={loadSamplePair}
+              className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+            >
+              Load Overlapping Curriculums Sample
+            </Button>
+          </div>
+
+          {/* Templates & Active Badge */}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
+            <span className="font-medium text-slate-300">Templates:</span>
+            <a
+              href="/samples/curriculum_cse2101_data_structures.md"
+              download="curriculum_cse2101_data_structures.md"
+              className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+            >
+              <Download className="h-3 w-3" /> Curriculum A (.md)
+            </a>
+            <span className="text-slate-600">·</span>
+            <a
+              href="/samples/curriculum_cse2103_algorithms.md"
+              download="curriculum_cse2103_algorithms.md"
+              className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+            >
+              <Download className="h-3 w-3" /> Curriculum B (.md)
+            </a>
+            {activeCohortTitle ? (
+              <>
+                <span className="text-slate-600">·</span>
+                <span className="font-semibold text-amber-400">{activeCohortTitle}</span>
+              </>
+            ) : null}
+          </div>
+
+          {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
           {samePair ? (
             <p className="mt-2 text-[11px] text-amber-300">
               Pick two different courses — a syllabus cannot be harmonized against itself.
-            </p>
-          ) : null}
-          {coursesQuery.isError ? (
-            <p className="mt-2 text-[11px] text-rose-300">
-              Could not load the course list: {coursesQuery.error?.message}
             </p>
           ) : null}
         </CardBody>
       </Card>
 
       {/* --- Results ------------------------------------------------------ */}
-      {!submitted ? (
+      {!submitted && !customCourseA && !customCourseB && !report ? (
         <Card>
           <EmptyState
             icon={ScanSearch}
             title="No audit run yet"
-            description="Choose a prerequisite course and the course that builds on it, then run the audit. Load Demo Pair prefills CSE 2101 → CSE 2103."
-            actionLabel={courses.length >= 2 ? 'Load Demo Pair' : undefined}
-            onAction={courses.length >= 2 ? loadDemoPair : undefined}
+            description="Upload two curriculum files (.md / .txt), choose a prerequisite and target course pair, or load the sample overlapping curricula preset."
+            actionLabel="Load Overlapping Curriculums Sample"
+            onAction={loadSamplePair}
           />
         </Card>
-      ) : auditQuery.isError ? (
+      ) : isFetching && !report ? (
+        <LoadingResults />
+      ) : auditQuery.isError || auditMutation.isError ? (
         <Card>
           <EmptyState
             tone="critical"
             icon={AlertTriangle}
             title="The harmonization audit failed"
-            description={auditQuery.error?.message ?? 'The request did not complete.'}
+            description={auditMutation.error?.message ?? auditQuery.error?.message ?? 'The request did not complete.'}
             actionLabel="Try again"
-            onAction={() => auditQuery.refetch()}
+            onAction={loadSamplePair}
           />
         </Card>
       ) : !report ? (
@@ -1009,7 +1176,7 @@ export default function CurriculumHarmonizerPage() {
       )}
 
       {/* Refetching an already-visible pair keeps the results on screen. */}
-      {submitted && report && auditQuery.isFetching ? (
+      {report && isFetching ? (
         <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
           <RotateCw className="h-3 w-3 animate-spin" strokeWidth={2} aria-hidden="true" />
           Re-running the audit…

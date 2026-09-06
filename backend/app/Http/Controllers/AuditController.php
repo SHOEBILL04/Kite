@@ -52,15 +52,30 @@ class AuditController extends Controller
     public function syllabus(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'course_a_id' => 'required|integer',
-            'course_b_id' => 'required|integer',
+            'course_a_id' => 'required_without_all:syllabus_a_markdown,syllabus_b_markdown|nullable|integer',
+            'course_b_id' => 'required_without_all:syllabus_a_markdown,syllabus_b_markdown|nullable|integer',
+            'syllabus_a_markdown' => 'required_without_all:course_a_id,course_b_id|nullable|string',
+            'syllabus_b_markdown' => 'required_without_all:course_a_id,course_b_id|nullable|string',
+            'course_a_code' => 'nullable|string',
+            'course_b_code' => 'nullable|string',
         ]);
 
         try {
-            $report = $this->syllabusHarmonizer->harmonise(
-                (int) $validated['course_a_id'],
-                (int) $validated['course_b_id']
-            );
+            if (!empty($validated['syllabus_a_markdown']) && !empty($validated['syllabus_b_markdown'])) {
+                $codeA = $validated['course_a_code'] ?? 'Course A';
+                $codeB = $validated['course_b_code'] ?? 'Course B';
+                $report = $this->syllabusHarmonizer->harmoniseCustom(
+                    $validated['syllabus_a_markdown'],
+                    $validated['syllabus_b_markdown'],
+                    $codeA,
+                    $codeB
+                );
+            } else {
+                $report = $this->syllabusHarmonizer->harmonise(
+                    (int) $validated['course_a_id'],
+                    (int) $validated['course_b_id']
+                );
+            }
             return response()->json(['data' => $report]);
         } catch (Throwable $e) {
             Log::error("Syllabus audit endpoint error: " . $e->getMessage());

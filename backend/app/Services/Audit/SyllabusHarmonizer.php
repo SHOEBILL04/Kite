@@ -124,6 +124,43 @@ class SyllabusHarmonizer
     }
 
     /**
+     * Audit custom uploaded syllabi markdown.
+     */
+    public function harmoniseCustom(
+        string $syllabusAMarkdown,
+        string $syllabusBMarkdown,
+        string $codeA = 'Course A',
+        string $codeB = 'Course B'
+    ): array {
+        $courseA = new Course(['code' => $codeA, 'title' => $codeA, 'syllabus_markdown' => $syllabusAMarkdown]);
+        $courseB = new Course(['code' => $codeB, 'title' => $codeB, 'syllabus_markdown' => $syllabusBMarkdown]);
+
+        $weeksA = $this->parseWeeks($syllabusAMarkdown);
+        $weeksB = $this->parseWeeks($syllabusBMarkdown);
+
+        $redundantTopics = $this->findRedundancies($courseA, $weeksA, $courseB, $weeksB);
+        $missingPrerequisites = $this->findMissingPrerequisites($courseA, $weeksA, $courseB, $weeksB);
+        $bloomCoverage = $this->bloomCoverage($weeksA, $weeksB);
+
+        $alignmentScore = (int) max(0, min(100,
+            100 - (count($redundantTopics) * 8) - (count($missingPrerequisites) * 12)
+        ));
+
+        $actionableChanges = $this->actionableChanges($courseA, $courseB, $redundantTopics, $missingPrerequisites);
+
+        return [
+            'alignment_score' => $alignmentScore,
+            'redundant_topics' => $redundantTopics,
+            'missing_prerequisites' => $missingPrerequisites,
+            'bloom_coverage' => $bloomCoverage,
+            'actionable_changes' => $actionableChanges,
+            'ai_summary' => $this->summarise(
+                $courseA, $courseB, $alignmentScore, $redundantTopics, $missingPrerequisites
+            ),
+        ];
+    }
+
+    /**
      * Split a syllabus into week entries.
      *
      * Annotations wrapped in *( ... )* are stripped before any matching. The
@@ -135,24 +172,39 @@ class SyllabusHarmonizer
     private function parseWeeks(string $markdown): array
     {
         $weeks = [];
+        $lines = explode("\n", $markdown);
+        $weekIndex = 1;
 
-        foreach (explode("\n", $markdown) as $line) {
-            if (! preg_match('/^\s*[-*]\s*\*\*Week\s+(\d+)[:.]?\*\*\s*(.+)$/i', trim($line), $m)) {
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if (! $trimmed || str_starts_with($trimmed, '#')) {
                 continue;
             }
 
-            $text = $m[2];
+            $weekNum = $weekIndex;
+            $text = $trimmed;
+
+            if (preg_match('/^\s*[-*]?\s*\*\*?Week\s+(\d+)[:.]?\*\*?\s*(.+)$/i', $trimmed, $m)) {
+                $weekNum = (int) $m[1];
+                $text = $m[2];
+            } elseif (preg_match('/^\s*[-*]\s*(.+)$/', $trimmed, $m)) {
+                $text = $m[1];
+            }
+
             $text = preg_replace('/\*\([^)]*\)\*/', '', $text);   // drop *( ... )* annotations
             $text = preg_replace('/\$[^$]*\$/', ' ', $text);       // drop inline LaTeX
             $text = str_replace(['**', '*', '[', ']'], ' ', $text);
             $text = trim(preg_replace('/\s+/', ' ', $text));
 
-            $weeks[] = [
-                'week' => (int) $m[1],
-                'label' => 'Week '.$m[1],
-                'text' => $text,
-                'norm' => mb_strtolower($text),
-            ];
+            if ($text !== '') {
+                $weeks[] = [
+                    'week' => $weekNum,
+                    'label' => 'Week '.$weekNum,
+                    'text' => $text,
+                    'norm' => mb_strtolower($text),
+                ];
+                $weekIndex++;
+            }
         }
 
         return $weeks;

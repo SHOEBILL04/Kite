@@ -124,6 +124,35 @@ class AuditEnginesTest extends TestCase
         ]);
     }
 
+    public function test_syllabus_harmonizer_handles_custom_uploaded_curricula(): void
+    {
+        $syllabusA = file_get_contents(storage_path('app/samples/curriculum_cse2101_data_structures.md'));
+        $syllabusB = file_get_contents(storage_path('app/samples/curriculum_cse2103_algorithms.md'));
+
+        $response = $this->postJson('/api/audit/syllabus', [
+            'syllabus_a_markdown' => $syllabusA,
+            'syllabus_b_markdown' => $syllabusB,
+            'course_a_code' => 'CSE 2101',
+            'course_b_code' => 'CSE 2103',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'alignment_score',
+                    'redundant_topics',
+                    'missing_prerequisites',
+                    'bloom_coverage',
+                    'actionable_changes',
+                    'ai_summary',
+                ],
+            ]);
+
+        $data = $response->json('data');
+        $this->assertGreaterThan(0, count($data['redundant_topics']));
+        $this->assertNotEmpty($data['ai_summary']);
+    }
+
     public function test_exam_moderator_flags_mark_sum_and_jaccard_duplicates(): void
     {
         $response = $this->postJson('/api/audit/exam-moderation', [
