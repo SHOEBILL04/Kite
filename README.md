@@ -1,4 +1,4 @@
-# CogniFaculty
+# KITE — Academic Intelligence & Quality Platform
 
 An academic quality-assurance console for university departments. It audits four
 things a department currently checks by hand, if at all:

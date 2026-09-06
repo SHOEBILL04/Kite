@@ -16,7 +16,7 @@ import { initials } from '../../lib/format.js';
 import { ROLE_LABELS } from '../../api/contract.js';
 import { USE_MOCK } from '../../api/client.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import { ApiStatus, Badge, Button } from '../ui/index.js';
+import { ApiStatus, Badge, Button, KiteIcon } from '../ui/index.js';
 
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', title: 'Faculty Dashboard', icon: LayoutDashboard },
@@ -94,17 +94,17 @@ export default function AppShell() {
     <div className="min-h-screen bg-canvas text-primary">
       {/* Sidebar (240px wide) */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-[240px] flex-col border-r border-border-default bg-surface shadow-xs">
-        {/* University Portal Brand Header */}
+        {/* KITE Platform Brand Header */}
         <div className="flex h-[56px] items-center gap-2.5 border-b border-border-default px-4 bg-surface">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-action-primary text-action-primary-text shadow-sm">
-            <GraduationCap className="h-5 w-5" strokeWidth={2} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface border border-border-default/80 shadow-2xs">
+            <KiteIcon size={22} />
           </div>
           <div className="leading-tight">
-            <div className="text-[16px] font-bold tracking-tight text-heading">
-              CogniFaculty
+            <div className="text-[17px] font-extrabold tracking-wider text-heading font-mono">
+              KITE
             </div>
             <div className="text-[9px] font-bold uppercase tracking-wider text-muted">
-              Academic Affairs & Audit
+              Academic Quality & Audit
             </div>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function AppShell() {
           <div className="flex items-center justify-between text-[11px] text-muted font-medium">
             <span className="flex items-center gap-1.5">
               <Shield className="h-3 w-3 text-action-primary" />
-              Faculty Portal
+              KITE Portal
             </span>
             <span className="font-mono text-[10px]">v1.0</span>
           </div>
@@ -141,7 +141,7 @@ export default function AppShell() {
         <div className="min-w-0 flex items-center gap-2">
           <span className="text-xs font-medium text-muted hidden sm:inline">Faculty Affairs /</span>
           <h1 className="truncate text-[17px] font-bold tracking-tight text-heading">
-            {active?.title ?? 'CogniFaculty'}
+            {active?.title ?? 'KITE'}
           </h1>
         </div>
 

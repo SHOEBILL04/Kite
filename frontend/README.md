@@ -1,4 +1,4 @@
-# CogniFaculty — Frontend
+# KITE — Frontend
 
 React 18 · Vite · Tailwind · React Router v6 · TanStack Query · Axios · Lucide · Recharts
 

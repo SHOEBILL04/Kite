@@ -15,8 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-import { USE_MOCK } from '../api/client.js';
-import { Badge, Button } from '../components/ui/index.js';
+import { Badge, Button, KiteIcon } from '../components/ui/index.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { cn } from '../lib/cn.js';
 
@@ -149,13 +148,13 @@ export default function Login() {
         <div className="relative z-10">
           {/* Logo & Platform Title */}
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-action-primary text-action-text text-base font-bold shadow-elevation">
-              CF
-            </span>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface border border-border-default/80 shadow-elevation">
+              <KiteIcon size={28} />
+            </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold tracking-tight text-heading">
-                  CogniFaculty
+                <span className="text-2xl font-extrabold tracking-wider text-heading font-mono">
+                  KITE
                 </span>
                 {USE_MOCK ? (
                   <Badge variant="warning" className="text-[10px] uppercase">
@@ -167,8 +166,8 @@ export default function Login() {
                   </Badge>
                 )}
               </div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-muted">
-                Academic Integrity & Quality Audit
+              <div className="text-[11px] font-bold uppercase tracking-widest text-muted">
+                Academic Quality & Intelligence Audit
               </div>
             </div>
           </div>

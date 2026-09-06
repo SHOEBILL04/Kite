@@ -9,7 +9,7 @@ const ThemeContext = createContext({
 export function ThemeProvider({ children }) {
   useEffect(() => {
     try {
-      localStorage.setItem('cognifaculty-theme', 'light');
+      localStorage.setItem('kite-theme', 'light');
     } catch (e) {}
     document.documentElement.setAttribute('data-theme', 'light');
     document.documentElement.classList.remove('dark');

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <!-- Top Right Facet (Brightest highlight) -->
+    <linearGradient id="facetTopRight" x1="32" y1="4" x2="58" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+
+    <!-- Top Left Facet (Midtone emerald) -->
+    <linearGradient id="facetTopLeft" x1="6" y1="26" x2="32" y2="4" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Bottom Left Facet (Deeper collegiate green) -->
+    <linearGradient id="facetBottomLeft" x1="6" y1="26" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+
+    <!-- Bottom Right Facet (Reflective forest green) -->
+    <linearGradient id="facetBottomRight" x1="58" y1="26" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <!-- Center spine sheen -->
+    <linearGradient id="spineSheen" x1="32" y1="4" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Soft ambient shadow -->
+    <filter id="kiteDropShadow" x="-10%" y="-10%" width="130%" height="130%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#064E3B" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <g filter="url(#kiteDropShadow)">
+    <!-- Top-Left Facet -->
+    <polygon points="32,6 32,27 8,25" fill="url(#facetTopLeft)" />
+
+    <!-- Top-Right Facet -->
+    <polygon points="32,6 56,25 32,27" fill="url(#facetTopRight)" />
+
+    <!-- Bottom-Left Facet -->
+    <polygon points="8,25 32,27 32,58" fill="url(#facetBottomLeft)" />
+
+    <!-- Bottom-Right Facet -->
+    <polygon points="32,27 56,25 32,58" fill="url(#facetBottomRight)" />
+
+    <!-- Center Geometric Cross/Spine Accents -->
+    <line x1="32" y1="6" x2="32" y2="58" stroke="url(#spineSheen)" stroke-width="1.5" stroke-linecap="round" />
+    <line x1="8" y1="25" x2="56" y2="25" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1" stroke-linecap="round" />
+
+    <!-- Sleek Aerodynamic Tail Ribbon -->
+    <path d="M32,58 Q31,61 34,63 Q37,65 35,68" stroke="#10B981" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.8" />
+  </g>
+</svg>

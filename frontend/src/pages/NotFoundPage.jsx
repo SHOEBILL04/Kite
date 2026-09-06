@@ -9,7 +9,7 @@ export default function NotFoundPage() {
         <EmptyState
           icon={MapPinOff}
           title="Page not found"
-          description="That route does not exist in CogniFaculty."
+          description="That route does not exist in KITE."
         />
         <div className="border-t border-border-default px-4 py-3 text-center">
           <Link

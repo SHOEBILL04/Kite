@@ -206,7 +206,7 @@ class DemoVerifyCommand extends Command
     private function report(): int
     {
         $this->newLine();
-        $this->line('  <options=bold>CogniFaculty — planted anomaly verification</>');
+        $this->line('  <options=bold>KITE — planted anomaly verification</>');
 
         $currentGroup = null;
         $failed = 0;

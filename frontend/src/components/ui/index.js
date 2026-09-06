@@ -14,3 +14,4 @@ export { EmptyState } from './EmptyState.jsx';
 export { Skeleton, SkeletonTable } from './Skeleton.jsx';
 export { AiSummaryCard } from './AiSummaryCard.jsx';
 export { default as ApiStatus } from './ApiStatus.jsx';
+export { default as KiteLogo, KiteIcon } from './KiteLogo.jsx';
