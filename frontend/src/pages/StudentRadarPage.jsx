@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowDown,
@@ -8,7 +8,6 @@ import {
   ChevronsUpDown,
   ClipboardCopy,
   Download,
-  Play,
   Radar,
   ShieldCheck,
   Upload,
@@ -17,8 +16,8 @@ import {
 } from 'lucide-react';
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-import { ENDPOINTS, QUERY_KEYS } from '../api/contract.js';
-import { get, post } from '../api/client.js';
+import { ENDPOINTS } from '../api/contract.js';
+import { post } from '../api/client.js';
 import { cn } from '../lib/cn.js';
 import { num, pct, ratioPct } from '../lib/format.js';
 import { attributeRisk, declineWindow, quizSlope, trajectorySeries } from '../lib/risk.js';
@@ -659,8 +658,6 @@ function DetailDrawer({ student, onClose }) {
  */
 export default function StudentRadarPage() {
   const fileInputRef = useRef(null);
-  const [courseId, setCourseId] = useState(null);
-  const [submittedCourseId, setSubmittedCourseId] = useState(null);
   const [sort, setSort] = useState({ column: 'risk_score', direction: 'desc' });
   const [sectionFilter, setSectionFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
@@ -671,36 +668,6 @@ export default function StudentRadarPage() {
 
   const isWide = useMediaQuery('(min-width: 768px)');
 
-  const coursesQuery = useQuery({
-    queryKey: QUERY_KEYS.courses,
-    queryFn: () => get(ENDPOINTS.courses),
-  });
-  const courses = coursesQuery.data ?? [];
-
-  // Default course selection
-  useEffect(() => {
-    if (!courseId && courses.length > 0) {
-      setCourseId(courses[0].id);
-    }
-  }, [courses, courseId]);
-
-  // If ?autorun=1 in URL, auto-run risk analysis
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('autorun') === '1' && courses.length > 0) {
-      setSubmittedCourseId(courses[0].id);
-    }
-  }, [courses]);
-
-  const auditQuery = useQuery({
-    queryKey: submittedCourseId
-      ? QUERY_KEYS.vulnerableStudents(submittedCourseId)
-      : ['audit', 'vulnerable-students', 'idle'],
-    queryFn: () => post(ENDPOINTS.auditVulnerableStudents, { course_id: submittedCourseId }),
-    enabled: Boolean(submittedCourseId),
-    retry: false,
-  });
-
   const auditMutation = useMutation({
     mutationFn: (payload) => post(ENDPOINTS.auditVulnerableStudents, payload),
     onSuccess: () => {
@@ -708,8 +675,35 @@ export default function StudentRadarPage() {
     },
   });
 
-  const report = auditMutation.data ?? auditQuery.data;
-  const isFetching = auditMutation.isPending || auditQuery.isFetching;
+  const loadSample = async (sampleType) => {
+    setLoadError(null);
+    setUploading(true);
+    try {
+      const fileName =
+        sampleType === 'high-risk'
+          ? '/samples/students_high_risk_cohort.json'
+          : '/samples/students_safe_balanced_cohort.json';
+      const res = await fetch(fileName);
+      if (!res.ok) throw new Error(`Could not fetch sample: ${fileName}`);
+      const data = await res.json();
+      setActiveCohortTitle(sampleType === 'high-risk' ? 'Sample: High-Risk Cohort' : 'Sample: Safe Healthy Cohort');
+      auditMutation.mutate({
+        students: data,
+      });
+    } catch (err) {
+      setLoadError(err.message ?? 'Could not load sample.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Auto-load high-risk sample cohort on mount
+  useEffect(() => {
+    loadSample('high-risk');
+  }, []);
+
+  const report = auditMutation.data;
+  const isFetching = auditMutation.isPending || uploading;
   const students = report?.students ?? [];
 
   const handleFileUpload = (event) => {
@@ -746,7 +740,6 @@ export default function StudentRadarPage() {
       setActiveCohortTitle(`Uploaded File: ${file.name}`);
       auditMutation.mutate({
         students: result.students,
-        course_id: courseId ?? 1,
       });
     };
 
@@ -756,29 +749,6 @@ export default function StudentRadarPage() {
 
     reader.readAsText(file);
     event.target.value = '';
-  };
-
-  const loadSample = async (sampleType) => {
-    setLoadError(null);
-    setUploading(true);
-    try {
-      const fileName =
-        sampleType === 'high-risk'
-          ? '/samples/students_high_risk_cohort.json'
-          : '/samples/students_safe_balanced_cohort.json';
-      const res = await fetch(fileName);
-      if (!res.ok) throw new Error(`Could not fetch sample: ${fileName}`);
-      const data = await res.json();
-      setActiveCohortTitle(sampleType === 'high-risk' ? 'Sample: High-Risk Cohort' : 'Sample: Safe Healthy Cohort');
-      auditMutation.mutate({
-        students: data,
-        course_id: courseId ?? 1,
-      });
-    } catch (err) {
-      setLoadError(err.message ?? 'Could not load sample.');
-    } finally {
-      setUploading(false);
-    }
   };
 
   const counts = useMemo(
@@ -844,7 +814,7 @@ export default function StudentRadarPage() {
         <CardHeader
           icon={Radar}
           title="Student radar"
-          subtitle="Academic risk signals across a course's sections. The audit returns flagged records only, so these counts describe the flagged cohort rather than the whole class."
+          subtitle="Academic risk signals across student cohorts. Upload student data or evaluate sample presets to identify attendance breaches, performance collapse, and assignment delays."
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="critical" dot>
@@ -860,45 +830,8 @@ export default function StudentRadarPage() {
           }
         />
         <CardBody className="space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="min-w-0 flex-1">
-              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                Course
-              </span>
-              <select
-                value={courseId ?? ''}
-                disabled={coursesQuery.isPending}
-                onChange={(event) =>
-                  setCourseId(event.target.value ? Number(event.target.value) : null)
-                }
-                className={cn(selectClass, 'w-full')}
-              >
-                <option value="">Select a course…</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.code} — {course.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <Button
-              size="md"
-              icon={Play}
-              loading={isFetching}
-              disabled={courseId === null || isFetching}
-              onClick={() => {
-                setSelected(null);
-                setActiveCohortTitle(null);
-                setSubmittedCourseId(courseId);
-              }}
-            >
-              Run Risk Analysis
-            </Button>
-          </div>
-
           {/* Action Bar: File Upload + 1-Click Cohort Testing */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
               size="sm"
@@ -1002,46 +935,42 @@ export default function StudentRadarPage() {
               </p>
             </div>
           ) : null}
-
-          {coursesQuery.isError ? (
-            <p className="mt-2 text-[11px] text-rose-300">
-              Could not load the course list: {coursesQuery.error?.message}
-            </p>
-          ) : null}
         </CardBody>
       </Card>
 
       {/* --- Results ------------------------------------------------------ */}
-      {!submittedCourseId ? (
+      {isFetching ? (
         <Card>
-          <EmptyState
-            icon={UserSearch}
-            title="No analysis run yet"
-            description="Pick a course and run the risk analysis. Results are pseudonymous academic indicators, ranked by risk score."
-          />
+          <CardHeader icon={Radar} title="Scanning cohort" subtitle="Scoring academic indicators…" />
+          <SkeletonTable rows={6} cols={8} />
         </Card>
-      ) : auditQuery.isError ? (
+      ) : auditMutation.isError ? (
         <Card>
           <EmptyState
             tone="critical"
             icon={AlertCircle}
             title="The risk analysis failed"
-            description={auditQuery.error?.message ?? 'The request did not complete.'}
+            description={auditMutation.error?.message ?? 'The request did not complete.'}
             actionLabel="Try again"
-            onAction={() => auditQuery.refetch()}
+            onAction={() => loadSample('high-risk')}
           />
         </Card>
       ) : !report ? (
         <Card>
-          <CardHeader icon={Radar} title="Scanning cohort" subtitle="Scoring academic indicators…" />
-          <SkeletonTable rows={6} cols={8} />
+          <EmptyState
+            icon={UserSearch}
+            title="No cohort loaded yet"
+            description="Upload a student data file (.csv or .json) or load a sample cohort above to evaluate academic risk signals."
+            actionLabel="Load High-Risk Sample"
+            onAction={() => loadSample('high-risk')}
+          />
         </Card>
       ) : !students.length ? (
         <Card>
           <EmptyState
             icon={Check}
             title="No students flagged"
-            description="No record in this course crossed a risk threshold this term."
+            description="No record in this cohort crossed an academic risk threshold."
           />
         </Card>
       ) : !visible.length ? (
