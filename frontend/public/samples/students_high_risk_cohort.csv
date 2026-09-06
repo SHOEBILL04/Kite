@@ -1,0 +1,16 @@
+student_hash,section_name,attendance_pct,quiz1,quiz2,quiz3,midterm_pct,assignment_delay_count
+STU_042,Section A,82,85,71,38,41.0,1
+STU_017,Section B,54,60,58,55,49.0,4
+STU_091,Section B,91,88,84,86,44.0,0
+STU_SEC_A_005,Section A,62,68,64,59,52.0,2
+STU_SEC_A_008,Section A,68,70,66,61,56.0,1
+STU_SEC_A_011,Section A,70,72,68,63,58.0,2
+STU_SEC_A_015,Section A,58,65,60,57,48.0,3
+STU_SEC_B_003,Section B,66,55,52,48,35.0,3
+STU_SEC_B_004,Section B,71,62,60,58,40.0,2
+STU_SEC_B_005,Section B,74,65,64,66,50.0,1
+STU_SEC_A_001,Section A,88,85,84,86,86.6,0
+STU_SEC_A_004,Section A,85,82,80,78,83.3,0
+STU_SEC_A_010,Section A,92,90,92,88,90.0,0
+STU_SEC_B_014,Section B,89,88,85,87,70.0,0
+STU_SEC_B_017,Section B,93,94,92,95,83.3,0

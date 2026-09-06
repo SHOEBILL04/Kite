@@ -76,11 +76,20 @@ class AuditController extends Controller
     public function examModeration(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'exam_id' => 'required|integer',
+            'exam_id' => 'required_without:questions|nullable|integer',
+            'questions' => 'required_without:exam_id|nullable|array',
+            'declared_total' => 'nullable|numeric',
+            'course_id' => 'nullable|integer',
         ]);
 
         try {
-            $report = $this->examModerator->moderate((int) $validated['exam_id']);
+            if (!empty($validated['questions'])) {
+                $declaredTotal = isset($validated['declared_total']) ? (float) $validated['declared_total'] : 70.0;
+                $courseId = isset($validated['course_id']) ? (int) $validated['course_id'] : null;
+                $report = $this->examModerator->moderateCustomQuestions($validated['questions'], $declaredTotal, $courseId);
+            } else {
+                $report = $this->examModerator->moderate((int) $validated['exam_id']);
+            }
             return response()->json(['data' => $report]);
         } catch (Throwable $e) {
             Log::error("Exam moderation endpoint error: " . $e->getMessage());

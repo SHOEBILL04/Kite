@@ -100,6 +100,46 @@ class RiskAnalyzer
     }
 
     /**
+     * Analyze custom uploaded student cohort data in real-time (100% deterministic, zero AI API dependency).
+     *
+     * @param  array<int, array<string, mixed>>  $rawStudents
+     * @param  int|null  $courseId
+     * @return array{at_risk_count:int, students:array<int, array<string, mixed>>}
+     */
+    public function analyzeCustomStudents(array $rawStudents, ?int $courseId = null): array
+    {
+        $analyzed = collect($rawStudents)->map(function (array $row) use ($courseId) {
+            $student = new Student([
+                'course_id' => $courseId ?? 1,
+                'student_hash' => (string) ($row['student_hash'] ?? 'STU_'.uniqid()),
+                'section_name' => (string) ($row['section_name'] ?? 'Section A'),
+                'attendance_pct' => (int) ($row['attendance_pct'] ?? 80),
+                'quiz1' => (float) ($row['quiz1'] ?? 75),
+                'quiz2' => (float) ($row['quiz2'] ?? 75),
+                'quiz3' => (float) ($row['quiz3'] ?? 75),
+                'midterm_pct' => (float) ($row['midterm_pct'] ?? 75),
+                'assignment_delay_count' => (int) ($row['assignment_delay_count'] ?? 0),
+            ]);
+
+            return $this->scoreStudent($student);
+        })
+        ->sortByDesc('risk_score')
+        ->values();
+
+        $flagged = $analyzed->filter(fn (array $s) => $s['tier'] !== RuleEngine::TIER_SAFE)->values();
+
+        $payloadStudents = $analyzed
+            ->map(fn (array $s) => $this->toContractShape($s, null))
+            ->values()
+            ->all();
+
+        return [
+            'at_risk_count' => $flagged->count(),
+            'students' => $payloadStudents,
+        ];
+    }
+
+    /**
      * Run both scorers over one student and reconcile them.
      *
      * @return array<string, mixed>

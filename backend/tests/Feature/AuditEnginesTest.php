@@ -214,4 +214,115 @@ class AuditEnginesTest extends TestCase
                 ],
             ]);
     }
+
+    public function test_exam_moderator_handles_custom_uploaded_questions_without_ai(): void
+    {
+        $balancedPath = storage_path('app/samples/sample_exam_balanced.json');
+        $this->assertFileExists($balancedPath);
+        $balancedSample = json_decode(file_get_contents($balancedPath), true);
+
+        $resBalanced = $this->postJson('/api/audit/exam-moderation', [
+            'declared_total' => 70,
+            'course_id' => $this->courseCSE2101->id,
+            'questions' => $balancedSample,
+        ]);
+
+        $resBalanced->assertStatus(200)
+            ->assertJsonPath('data.mark_sum_valid', true)
+            ->assertJsonPath('data.calculated_total', 70)
+            ->assertJsonPath('data.cognitive_balance.verdict', 'pass');
+
+        $this->assertEmpty($resBalanced->json('data.duplicates'));
+
+        // Now test defective sample
+        $defectivePath = storage_path('app/samples/sample_exam_defective.json');
+        $this->assertFileExists($defectivePath);
+        $defectiveSample = json_decode(file_get_contents($defectivePath), true);
+
+        $resDefective = $this->postJson('/api/audit/exam-moderation', [
+            'declared_total' => 70,
+            'course_id' => $this->courseCSE2101->id,
+            'questions' => $defectiveSample,
+        ]);
+
+        $resDefective->assertStatus(200)
+            ->assertJsonPath('data.mark_sum_valid', false)
+            ->assertJsonPath('data.calculated_total', 72);
+
+        $this->assertNotEmpty($resDefective->json('data.duplicates'));
+    }
+
+    public function test_vulnerable_students_handles_custom_uploaded_cohort_without_ai(): void
+    {
+        // 1. Test High Risk Cohort
+        $highRiskPath = storage_path('app/samples/students_high_risk_cohort.csv');
+        $this->assertFileExists($highRiskPath);
+
+        $csvLines = array_map('str_getcsv', file($highRiskPath));
+        $header = array_shift($csvLines);
+        $highRiskStudents = [];
+        foreach ($csvLines as $row) {
+            if (count($row) === count($header)) {
+                $highRiskStudents[] = array_combine($header, $row);
+            }
+        }
+
+        $resHighRisk = $this->postJson('/api/audit/vulnerable-students', [
+            'students' => $highRiskStudents,
+        ]);
+
+        $resHighRisk->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'at_risk_count',
+                    'students' => [
+                        '*' => [
+                            'student_hash',
+                            'section_name',
+                            'risk_level',
+                            'risk_score',
+                            'ml_probability',
+                            'attendance_pct',
+                            'quiz_trend',
+                            'midterm_pct',
+                            'triggers',
+                            'recommended_action',
+                            'narrative',
+                        ],
+                    ],
+                ],
+            ]);
+
+        $dataHigh = $resHighRisk->json('data');
+        $this->assertGreaterThan(0, $dataHigh['at_risk_count']);
+
+        $stu042 = collect($dataHigh['students'])->firstWhere('student_hash', 'STU_042');
+        $this->assertNotNull($stu042);
+        $this->assertContains($stu042['risk_level'], ['high', 'critical', 'medium']);
+        $this->assertNotEmpty($stu042['triggers']);
+
+        // 2. Test Safe Cohort
+        $safePath = storage_path('app/samples/students_safe_balanced_cohort.csv');
+        $this->assertFileExists($safePath);
+
+        $safeLines = array_map('str_getcsv', file($safePath));
+        $safeHeader = array_shift($safeLines);
+        $safeStudents = [];
+        foreach ($safeLines as $row) {
+            if (count($row) === count($safeHeader)) {
+                $safeStudents[] = array_combine($safeHeader, $row);
+            }
+        }
+
+        $resSafe = $this->postJson('/api/audit/vulnerable-students', [
+            'students' => $safeStudents,
+        ]);
+
+        $resSafe->assertStatus(200);
+        $dataSafe = $resSafe->json('data');
+        $this->assertEquals(0, $dataSafe['at_risk_count']);
+        foreach ($dataSafe['students'] as $s) {
+            $this->assertEquals('low', $s['risk_level']);
+        }
+    }
 }

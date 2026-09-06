@@ -1,0 +1,9 @@
+q_number,text,marks,assigned_bloom_level,assigned_clo
+1,"Explain the operational distinctions and cache implications between an array-based contiguous queue and a pointer-based linked queue.",8.0,C2,CLO1
+2,"Apply Dijkstra's single-source shortest path algorithm on a directed weighted graph with edge weights strictly positive. Tabulate distance estimates at each relaxation step.",10.0,C3,CLO3
+3,"Demonstrate the execution of Radix Sort on an unsorted list of 8 3-digit keys. Detail the intermediate bucket distributions for each significant digit pass.",8.0,C3,CLO2
+4,"Analyze why hash table rehashing requires rehashing every entry rather than simply doubling the underlying array size. Formulate the amortized cost per insertion.",10.0,C4,CLO1
+5,"Deconstruct how a red-black tree preserves O(log n) worst-case search bounds using node coloring rules following successive red child violations.",8.0,C4,CLO2
+6,"Critique and evaluate whether a Min-Heap can efficiently support decrease-key operations in O(log n) time without maintaining an auxiliary positional hash index.",10.0,C5,CLO3
+7,"Evaluate the correctness of Tarjan's strongly connected components algorithm compared to Kosaraju's two-pass DFS approach under strict single-pass graph streaming conditions.",8.0,C5,CLO3
+8,"Design and synthesize an augmented Interval Tree that maintains the maximum endpoint across subtrees, enabling overlap queries in O(k log n) time.",8.0,C6,CLO4

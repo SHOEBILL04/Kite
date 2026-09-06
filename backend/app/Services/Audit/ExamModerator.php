@@ -194,6 +194,158 @@ class ExamModerator
     }
 
     /**
+     * Moderate custom uploaded questions directly (pure deterministic PHP, zero AI API dependency).
+     */
+    public function moderateCustomQuestions(array $rawQuestions, float $declaredTotal = 70.0, ?int $courseId = null): array
+    {
+        if (empty($rawQuestions)) {
+            return $this->aiClient->loadFixture('exam-moderation');
+        }
+
+        $calculatedTotal = 0.0;
+        foreach ($rawQuestions as $q) {
+            $calculatedTotal += (float) ($q['marks'] ?? 0);
+        }
+        $markSumValid = abs($calculatedTotal - $declaredTotal) < 0.001;
+
+        // Cognitive Balance
+        $lowerMarks = 0.0;
+        $higherMarks = 0.0;
+        $hasC5C6 = false;
+
+        foreach ($rawQuestions as $q) {
+            $level = strtoupper(trim($q['assigned_bloom_level'] ?? 'C1'));
+            $m = (float) ($q['marks'] ?? 0);
+
+            if (in_array($level, ['C1', 'C2', 'C3'])) {
+                $lowerMarks += $m;
+            } elseif (in_array($level, ['C4', 'C5', 'C6'])) {
+                $higherMarks += $m;
+                if (in_array($level, ['C5', 'C6'])) {
+                    $hasC5C6 = true;
+                }
+            }
+        }
+
+        $totalMarksCounted = max(1.0, $calculatedTotal);
+        $lowerOrderPct = round(($lowerMarks / $totalMarksCounted) * 100, 1);
+        $higherOrderPct = round(($higherMarks / $totalMarksCounted) * 100, 1);
+        $cognitiveVerdict = ($higherOrderPct < 30.0 || !$hasC5C6) ? 'warning' : 'pass';
+
+        $cognitiveBalance = [
+            'lower_order_pct' => $lowerOrderPct,
+            'higher_order_pct' => $higherOrderPct,
+            'verdict' => $cognitiveVerdict,
+        ];
+
+        // Past Question duplicate detection
+        $pastQuery = ExamQuestion::where('is_past_paper', true)->with('exam');
+        if ($courseId) {
+            $pastQuery->whereHas('exam', function ($q) use ($courseId) {
+                $q->where('course_id', $courseId);
+            });
+        }
+        $pastQuestions = $pastQuery->get();
+
+        $duplicates = [];
+        $phpFlagsByQ = [];
+
+        foreach ($rawQuestions as $draftQ) {
+            $qNum = (string) ($draftQ['q_number'] ?? '');
+            $phpFlagsByQ[$qNum] = [];
+            $text = (string) ($draftQ['text'] ?? '');
+            $marks = (float) ($draftQ['marks'] ?? 0);
+            $draftTokens = $this->tokenize($text);
+
+            foreach ($pastQuestions as $pastQ) {
+                $pastTokens = $this->tokenize($pastQ->text);
+                $sim = $this->jaccardSimilarity($draftTokens, $pastTokens);
+
+                if ($sim > 0.55) {
+                    $matchedYear = ($pastQ->exam->semester ?? 'Past Paper') . ' ' . ($pastQ->exam->exam_type ?? 'Final');
+                    $duplicates[] = [
+                        'draft_q' => $qNum,
+                        'matched_year' => $matchedYear,
+                        'matched_text' => $pastQ->text,
+                        'similarity_score' => round($sim, 2),
+                        'rewrite_suggestion' => 'Alter the graph topology, parameter constraints, or algorithmic invariants to evaluate transfer rather than recall of past solution keys.',
+                    ];
+
+                    $phpFlagsByQ[$qNum][] = [
+                        'type' => 'duplicate_question',
+                        'message' => "High text similarity (" . round($sim * 100) . "%) against {$matchedYear} question. Paper is in circulation.",
+                    ];
+                }
+            }
+
+            $timeFlags = $this->checkMarkToTimeHeuristic($text, $marks);
+            foreach ($timeFlags as $tf) {
+                $phpFlagsByQ[$qNum][] = $tf;
+            }
+        }
+
+        // Moderated questions
+        $moderatedQuestions = [];
+        foreach ($rawQuestions as $q) {
+            $qNum = (string) ($q['q_number'] ?? '');
+            $text = (string) ($q['text'] ?? '');
+            $assignedLevel = strtoupper(trim($q['assigned_bloom_level'] ?? 'C1'));
+            $detectedLevel = $this->inferBloomFallback($text);
+
+            $flags = $phpFlagsByQ[$qNum] ?? [];
+
+            if ($assignedLevel !== $detectedLevel) {
+                $levelDelta = abs((int) substr($assignedLevel, 1) - (int) substr($detectedLevel, 1));
+                if ($levelDelta >= 2) {
+                    $flags[] = [
+                        'type' => 'verb_mismatch',
+                        'message' => "Question is tagged {$assignedLevel} but action verbs assess {$detectedLevel} capability. Cognitive overstatement of {$levelDelta} levels.",
+                    ];
+                }
+            }
+
+            $verdict = 'pass';
+            if (!empty($flags)) {
+                $hasCritical = false;
+                foreach ($flags as $f) {
+                    if (in_array($f['type'], ['duplicate_question', 'clo_inflation']) || str_contains($f['message'], 'overstatement')) {
+                        $hasCritical = true;
+                        break;
+                    }
+                }
+                $verdict = $hasCritical ? 'critical' : 'warning';
+            }
+
+            $moderatedQuestions[] = [
+                'q_number' => $qNum,
+                'text' => $text,
+                'marks' => (float) ($q['marks'] ?? 0),
+                'assigned_bloom_level' => $assignedLevel,
+                'detected_bloom_level' => $detectedLevel,
+                'verdict' => $verdict,
+                'flags' => $flags,
+            ];
+        }
+
+        return [
+            'mark_sum_valid' => $markSumValid,
+            'calculated_total' => $calculatedTotal,
+            'declared_total' => $declaredTotal,
+            'questions' => $moderatedQuestions,
+            'duplicates' => $duplicates,
+            'cognitive_balance' => $cognitiveBalance,
+            'ai_summary' => $this->deterministicSummary(
+                $markSumValid,
+                $calculatedTotal,
+                $declaredTotal,
+                $moderatedQuestions,
+                $duplicates,
+                $cognitiveBalance
+            ),
+        ];
+    }
+
+    /**
      * Mark-to-time heuristic based on action verb class.
      */
     protected function checkMarkToTimeHeuristic(string $text, float $marks): array
