@@ -31,34 +31,10 @@ class AiClient
     {
         try {
             return $this->run('vulnerable-students', $system, $prompt, $schema);
-        } catch (Throwable $e) {
-            Log::warning('AiClient: structured call failed: ' . $e->getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * One structured JSON response (used by RiskAnalyzer).
-     *
-     * @param string $system
-     * @param string $prompt
-     * @param array $schema
-     * @param int $maxTokens
-     * @return array|null
-     */
-    public function structured(string $system, string $prompt, array $schema, int $maxTokens = 8000): ?array
-    {
-        try {
-            return $this->run('vulnerable-students', $system, $prompt, $schema);
         } catch (\Throwable $e) {
             Log::warning('AiClient: structured call failed: ' . $e->getMessage());
             return null;
         }
-    }
-
-    public function isConfigured(): bool
-    {
-        return !empty(config('services.gemini.key')) || !empty(config('services.groq.key'));
     }
 
 
