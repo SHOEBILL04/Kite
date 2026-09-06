@@ -4,6 +4,7 @@ import { Spinner } from './components/ui/index.js';
 import { useAuth } from './hooks/useAuth.js';
 
 import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import GradingParityPage from './pages/GradingParityPage.jsx';
 import ExamModerationPage from './pages/ExamModerationPage.jsx';
@@ -15,9 +16,11 @@ import NotFoundPage from './pages/NotFoundPage.jsx';
  * Blocks a route until the session is known. While `isLoading` is true the
  * session is still being restored from localStorage — redirecting then would
  * bounce an authenticated user out on every refresh.
+ *
+ * Supports an optional `roles` prop to restrict access by role.
  */
-export function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+export function ProtectedRoute({ roles, children }) {
+  const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -32,6 +35,10 @@ export function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  if (roles && roles.length > 0 && (!user?.role || !roles.includes(user.role))) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }
 
@@ -39,6 +46,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       <Route
         element={
@@ -59,3 +67,4 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+
