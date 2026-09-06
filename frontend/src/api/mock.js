@@ -491,6 +491,114 @@ export const MOCK_SYLLABUS = {
     'CSE 2101 and CSE 2103 align at 62/100. Three topic blocks are taught twice — asymptotic notation, recursion, and BFS/DFS — consuming roughly three of the twelve weeks in CSE 2103 on material already assessed in CSE 2101. Against that redundancy sit two genuine gaps: CSE 2103 assumes binary heaps and basic amortized analysis, neither of which appears anywhere in the CSE 2101 syllabus, so students meet Fibonacci heaps without ever having built a binary one. Reallocating the three redundant weeks to those prerequisites would close both gaps without extending either course.',
 };
 
+/** @type {import('./contract.js').NewCourseCrossAuditReport} */
+export const MOCK_SYLLABUS_CROSS_AUDIT = {
+  proposed_course: {
+    code: 'CSE 3105',
+    title: 'Machine Learning & Data Analytics',
+    weeks_count: 12,
+  },
+  most_matched_course: {
+    course_id: 2,
+    course_code: 'CSE 2103',
+    course_title: 'Algorithms',
+    overlap_percentage: 25,
+    redundant_topics_count: 3,
+    missing_prerequisites_count: 0,
+    redundant_topics: [
+      {
+        topic: 'Complexity analysis and asymptotic notation',
+        course_a_ref: 'CSE 2103 · Week 1',
+        course_b_ref: 'CSE 3105 · Week 1',
+        similarity: 0.88,
+      },
+      {
+        topic: 'Optimization paradigms and Gradient Descent',
+        course_a_ref: 'CSE 2103 · Week 7',
+        course_b_ref: 'CSE 3105 · Week 2',
+        similarity: 0.72,
+      },
+      {
+        topic: 'Clustering and Graph Traversal partitioning',
+        course_a_ref: 'CSE 2103 · Week 6',
+        course_b_ref: 'CSE 3105 · Week 6',
+        similarity: 0.65,
+      },
+    ],
+    missing_prerequisites: [],
+  },
+  catalog_matches: [
+    {
+      course_id: 2,
+      course_code: 'CSE 2103',
+      course_title: 'Algorithms',
+      overlap_percentage: 25,
+      redundant_topics_count: 3,
+      missing_prerequisites_count: 0,
+      redundant_topics: [
+        {
+          topic: 'Complexity analysis and asymptotic notation',
+          course_a_ref: 'CSE 2103 · Week 1',
+          course_b_ref: 'CSE 3105 · Week 1',
+          similarity: 0.88,
+        },
+      ],
+      missing_prerequisites: [],
+    },
+    {
+      course_id: 1,
+      course_code: 'CSE 2101',
+      course_title: 'Data Structures',
+      overlap_percentage: 17,
+      redundant_topics_count: 2,
+      missing_prerequisites_count: 0,
+      redundant_topics: [
+        {
+          topic: 'Recursion and Tree structures',
+          course_a_ref: 'CSE 2101 · Week 7',
+          course_b_ref: 'CSE 3105 · Week 4',
+          similarity: 0.61,
+        },
+      ],
+      missing_prerequisites: [],
+    },
+    {
+      course_id: 3,
+      course_code: 'CSE 3101',
+      course_title: 'Database Management Systems',
+      overlap_percentage: 8,
+      redundant_topics_count: 1,
+      missing_prerequisites_count: 0,
+      redundant_topics: [],
+      missing_prerequisites: [],
+    },
+    {
+      course_id: 4,
+      course_code: 'CSE 4101',
+      course_title: 'Software Engineering',
+      overlap_percentage: 0,
+      redundant_topics_count: 0,
+      missing_prerequisites_count: 0,
+      redundant_topics: [],
+      missing_prerequisites: [],
+    },
+  ],
+  novel_topics: [
+    { week: 3, label: 'Week 3', topic: 'Logistic Regression & Classification' },
+    { week: 5, label: 'Week 5', topic: 'Support Vector Machines (SVM)' },
+    { week: 7, label: 'Week 7', topic: 'Principal Component Analysis (PCA)' },
+    { week: 8, label: 'Week 8', topic: 'Neural Networks & Backpropagation' },
+    { week: 9, label: 'Week 9', topic: 'Convolutional Neural Networks (CNNs)' },
+    { week: 10, label: 'Week 10', topic: 'Natural Language Processing & Transformers' },
+    { week: 11, label: 'Week 11', topic: 'Model Evaluation & Hyperparameter Tuning' },
+    { week: 12, label: 'Week 12', topic: 'Ethics & Governance in AI' },
+  ],
+  novel_topics_count: 8,
+  bloom_coverage: { C1: 1, C2: 3, C3: 4, C4: 3, C5: 1, C6: 1 },
+  ai_summary:
+    'The uploaded curriculum introduces 8 novel topic modules into the program. Highest similarity was identified with CSE 2103 (Algorithms) at 25% overlap primarily around asymptotic analysis and optimization techniques. No critical prerequisite gaps were detected.',
+};
+
 /* ==========================================================================
  * AUDIT 3 — EXAM MODERATION  (CSE 2101 Fall 2025 Final, draft)
  * ======================================================================= */
@@ -1022,6 +1130,9 @@ export function resolveMock(method, url, body = {}) {
 
     case 'post /audit/syllabus':
       return { data: MOCK_SYLLABUS };
+
+    case 'post /audit/syllabus/cross-audit':
+      return { data: MOCK_SYLLABUS_CROSS_AUDIT };
 
     case 'post /audit/exam-moderation':
       return { data: MOCK_EXAM_MODERATION };

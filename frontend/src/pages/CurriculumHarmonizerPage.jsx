@@ -7,12 +7,14 @@ import {
   ChevronDown,
   Copy,
   Download,
+  FileText,
   GitCompare,
   Layers,
   ListChecks,
   Play,
   RotateCw,
   ScanSearch,
+  Sparkles,
   Upload,
 } from 'lucide-react';
 import {
@@ -798,14 +800,48 @@ function LoadingResults() {
 }
 
 /* ==========================================================================
- * Propose New Course Catalog Cross-Audit View
+ * Single Curriculum Catalog Match & Cross-Audit View
  * ======================================================================= */
 
-function NewCourseCrossAuditView() {
-  const fileInputRef = useRef(null);
-  const [code, setCode] = useState('CSE 3105');
-  const [title, setTitle] = useState('Machine Learning & Data Analytics');
-  const [syllabusMarkdown, setSyllabusMarkdown] = useState(`# CSE 3105: Machine Learning & Data Analytics
+const SAMPLE_PRESETS = [
+  {
+    id: 'ml',
+    name: 'CSE 3105 Machine Learning (Proposed)',
+    file: '/samples/curriculum_proposed_cse3105_machine_learning.md',
+    code: 'CSE 3105',
+    title: 'Machine Learning & Data Analytics',
+  },
+  {
+    id: 'algo',
+    name: 'CSE 2103 Algorithms',
+    file: '/samples/curriculum_cse2103_algorithms.md',
+    code: 'CSE 2103',
+    title: 'Algorithms',
+  },
+  {
+    id: 'ds',
+    name: 'CSE 2101 Data Structures',
+    file: '/samples/curriculum_cse2101_data_structures.md',
+    code: 'CSE 2101',
+    title: 'Data Structures',
+  },
+  {
+    id: 'dbms',
+    name: 'CSE 3101 Database Systems',
+    file: '/samples/curriculum_cse3101_database_systems.md',
+    code: 'CSE 3101',
+    title: 'Database Management Systems',
+  },
+  {
+    id: 'ai',
+    name: 'CSE 4103 Artificial Intelligence',
+    file: '/samples/curriculum_cse4103_artificial_intelligence.md',
+    code: 'CSE 4103',
+    title: 'Artificial Intelligence',
+  },
+];
+
+const INITIAL_MARKDOWN = `# CSE 3105: Machine Learning & Data Analytics
 
 - **Week 1:** Introduction to machine learning paradigms, supervised vs unsupervised learning, and asymptotic complexity review.
 - **Week 2:** Linear Regression: Gradient descent optimization, loss functions, and matrix formulations.
@@ -818,9 +854,18 @@ function NewCourseCrossAuditView() {
 - **Week 9:** Neural Networks II: Convolutional Neural Networks (CNNs), pooling layers, feature maps, and image classification.
 - **Week 10:** Natural Language Processing: Tokenization, Word Embeddings (Word2Vec), Recurrent Neural Networks (RNNs), and Attention.
 - **Week 11:** Model Evaluation & Hyperparameter Tuning: Cross-validation, Bias-Variance tradeoff, Precision, Recall, F1-Score, and ROC-AUC.
-- **Week 12:** Ethics & Governance in AI: Algorithmic bias, fairness metrics, model explainability (SHAP/LIME), and deployment pipelines.`);
+- **Week 12:** Ethics & Governance in AI: Algorithmic bias, fairness metrics, model explainability (SHAP/LIME), and deployment pipelines.`;
+
+function NewCourseCrossAuditView() {
+  const fileInputRef = useRef(null);
+  const [code, setCode] = useState('CSE 3105');
+  const [title, setTitle] = useState('Machine Learning & Data Analytics');
+  const [syllabusMarkdown, setSyllabusMarkdown] = useState(INITIAL_MARKDOWN);
   const [loadError, setLoadError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const [activePresetId, setActivePresetId] = useState('ml');
 
   const crossAuditMutation = useMutation({
     mutationFn: (payload) => post(ENDPOINTS.auditSyllabusCrossAudit, payload),
@@ -829,44 +874,82 @@ function NewCourseCrossAuditView() {
   const report = crossAuditMutation.data;
   const isFetching = crossAuditMutation.isPending || uploading;
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files?.[0];
+  // Auto-run cross-audit on mount so the user immediately sees the report
+  useEffect(() => {
+    if (!crossAuditMutation.data && !crossAuditMutation.isPending && syllabusMarkdown.trim()) {
+      crossAuditMutation.mutate({
+        syllabus_markdown: syllabusMarkdown,
+        code,
+        title,
+      });
+    }
+  }, []);
+
+  const processFile = (file) => {
     if (!file) return;
     setLoadError(null);
+    setActivePresetId(null);
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result;
       if (typeof content !== 'string') return;
       setSyllabusMarkdown(content);
-      const inferredCode = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+
+      // Inforce and extract course code / title from markdown heading if present
+      const titleMatch = content.match(/^#\s*([A-Z]{2,4}\s*\d{3,4})?\s*[:\-–—]?\s*([^\n\r]+)/m);
+      let inferredCode = file.name.replace(/^curriculum_/i, '').replace(/\.[^/.]+$/, '').replace(/_/g, ' ').toUpperCase();
+      let inferredTitle = inferredCode;
+
+      if (titleMatch) {
+        if (titleMatch[1]) inferredCode = titleMatch[1].trim();
+        if (titleMatch[2]) inferredTitle = titleMatch[2].replace(/\*\*/g, '').trim();
+      }
+
       setCode(inferredCode);
+      setTitle(inferredTitle);
+
       crossAuditMutation.mutate({
         syllabus_markdown: content,
         code: inferredCode,
-        title,
+        title: inferredTitle,
       });
     };
     reader.readAsText(file);
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (file) processFile(file);
     event.target.value = '';
   };
 
-  const loadSampleProposed = async () => {
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  };
+
+  const loadPreset = async (preset) => {
     setLoadError(null);
     setUploading(true);
+    setActivePresetId(preset.id);
     try {
-      const res = await fetch('/samples/curriculum_proposed_cse3105_machine_learning.md');
-      if (!res.ok) throw new Error('Could not fetch proposed course sample.');
+      const res = await fetch(preset.file);
+      if (!res.ok) throw new Error(`Could not load preset ${preset.name}.`);
       const text = await res.text();
       setSyllabusMarkdown(text);
-      setCode('CSE 3105');
-      setTitle('Machine Learning & Data Analytics');
+      setCode(preset.code);
+      setTitle(preset.title);
       crossAuditMutation.mutate({
         syllabus_markdown: text,
-        code: 'CSE 3105',
-        title: 'Machine Learning & Data Analytics',
+        code: preset.code,
+        title: preset.title,
       });
     } catch (err) {
-      setLoadError(err.message ?? 'Failed to load proposed course sample.');
+      setLoadError(err.message ?? 'Failed to load sample curriculum.');
     } finally {
       setUploading(false);
     }
@@ -883,96 +966,157 @@ function NewCourseCrossAuditView() {
 
   return (
     <div className="space-y-4">
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".md,.txt" className="hidden" />
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".md,.txt"
+        className="hidden"
+      />
 
-      <Card>
+      {/* --- Upload & Control Hub --- */}
+      <Card className="border-border-strong shadow-sm">
         <CardHeader
           icon={Layers}
-          title="Propose new course & cross-audit catalog"
-          subtitle="Define a proposed course curriculum following the week-by-week schema. The engine automatically audits it against all existing courses in the catalog, identifies the most matched course, isolates novel material, and evaluates prerequisite alignment."
+          title="Single Curriculum Match & Catalog Cross-Audit"
+          subtitle="Upload the file of one curriculum to match it against all available courses in the catalog. The engine scans the department catalog, calculates content similarity scores, identifies the most similar course, and highlights novel topics."
         />
         <CardBody className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted mb-1">
-                Proposed Course Code
-              </label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="e.g. CSE 3105"
-                className="w-full h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-xs text-text-primary focus:border-border-focus focus:outline-none"
-              />
+          {/* Drag & Drop Upload Zone */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              'flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all',
+              isDragOver
+                ? 'border-action-primary bg-forest-50/60 dark:bg-forest-950/20 scale-[1.005]'
+                : 'border-border-strong bg-bg-surface hover:border-action-primary hover:bg-bg-subtle'
+            )}
+          >
+            <div className="h-12 w-12 rounded-full bg-forest-100 dark:bg-forest-900/40 text-action-primary flex items-center justify-center mb-3 shadow-sm">
+              <Upload className="h-6 w-6" />
             </div>
-            <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted mb-1">
-                Proposed Course Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Machine Learning & Data Analytics"
-                className="w-full h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-xs text-text-primary focus:border-border-focus focus:outline-none"
-              />
+            <div className="text-center">
+              <span className="text-sm font-semibold text-text-primary">
+                Click to upload or drag & drop curriculum file (.md / .txt)
+              </span>
+              <p className="text-xs text-text-muted mt-1 max-w-md">
+                Upload any syllabus markdown file. It will immediately cross-reference every course in the catalog and output the similarity report.
+              </p>
             </div>
+            {code && (
+              <div className="mt-3 flex items-center gap-2 px-3 py-1 rounded-full bg-forest-50 dark:bg-forest-950/40 border border-forest-200 dark:border-forest-800 text-[11px] text-forest-800 dark:text-forest-200">
+                <Check className="h-3 w-3 text-action-primary" />
+                <span>Currently Loaded: <strong>{code}</strong> — {title || 'Curriculum'}</span>
+              </div>
+            )}
           </div>
 
+          {/* Quick Presets Selection */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
-                Syllabus Markdown Schema (Week-by-Week Topics)
-              </label>
-              <a
-                href="/samples/curriculum_proposed_cse3105_machine_learning.md"
-                download="proposed_course_schema_template.md"
-                className="inline-flex items-center gap-1 font-mono text-[11px] text-action-primary underline hover:opacity-80"
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-action-primary" /> Or test with sample departmental curriculums:
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowEditor((prev) => !prev)}
+                className="text-[11px] font-medium text-action-primary hover:underline flex items-center gap-1"
               >
-                <Download className="h-3 w-3" /> Download Schema Template
-              </a>
+                <FileText className="h-3 w-3" />
+                {showEditor ? 'Hide Curriculum Editor' : 'View / Edit Syllabus Markdown'}
+              </button>
             </div>
-            <textarea
-              rows={8}
-              value={syllabusMarkdown}
-              onChange={(e) => setSyllabusMarkdown(e.target.value)}
-              className="w-full rounded-lg border border-border-default bg-bg-surface p-3 font-mono text-xs text-text-primary focus:border-border-focus focus:outline-none"
-            />
+            <div className="flex flex-wrap gap-2">
+              {SAMPLE_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => loadPreset(preset)}
+                  disabled={uploading}
+                  className={cn(
+                    'px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                    activePresetId === preset.id
+                      ? 'border-action-primary bg-forest-50 text-forest-900 font-semibold dark:bg-forest-900/30 dark:text-forest-200 ring-1 ring-action-primary'
+                      : 'border-border-default bg-bg-surface text-text-secondary hover:border-border-strong hover:bg-bg-subtle'
+                  )}
+                >
+                  {preset.name}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-default pt-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Upload}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Upload Proposed Syllabus (.md / .txt)
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Layers}
-                loading={uploading}
-                onClick={loadSampleProposed}
-                className="border-action-primary text-action-primary hover:bg-bg-subtle"
-              >
-                Load Sample Proposed Course (CSE 3105 ML)
-              </Button>
-            </div>
+          {/* Collapsible Editor (if user wants to customize) */}
+          {showEditor && (
+            <div className="pt-3 border-t border-border-default space-y-3 bg-bg-subtle/50 p-3 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted mb-1">
+                    Course Code
+                  </label>
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="e.g. CSE 3105"
+                    className="w-full h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-xs text-text-primary focus:border-border-focus focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted mb-1">
+                    Course Title
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. Machine Learning & Data Analytics"
+                    className="w-full h-9 rounded-lg border border-border-default bg-bg-surface px-3 text-xs text-text-primary focus:border-border-focus focus:outline-none"
+                  />
+                </div>
+              </div>
 
-            <Button
-              variant="primary"
-              size="md"
-              icon={Play}
-              loading={isFetching}
-              disabled={!syllabusMarkdown.trim() || isFetching}
-              onClick={runCrossAudit}
-            >
-              Run Catalog Cross-Audit & Report
-            </Button>
-          </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                    Syllabus Markdown Content
+                  </label>
+                  <a
+                    href="/samples/curriculum_proposed_cse3105_machine_learning.md"
+                    download="syllabus_template.md"
+                    className="inline-flex items-center gap-1 font-mono text-[11px] text-action-primary underline hover:opacity-80"
+                  >
+                    <Download className="h-3 w-3" /> Download Template
+                  </a>
+                </div>
+                <textarea
+                  rows={6}
+                  value={syllabusMarkdown}
+                  onChange={(e) => setSyllabusMarkdown(e.target.value)}
+                  className="w-full rounded-lg border border-border-default bg-bg-surface p-3 font-mono text-xs text-text-primary focus:border-border-focus focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Play}
+                  loading={isFetching}
+                  disabled={!syllabusMarkdown.trim() || isFetching}
+                  onClick={runCrossAudit}
+                >
+                  Re-run Similarity Match
+                </Button>
+              </div>
+            </div>
+          )}
 
           {loadError ? <p className="text-[11px] text-critical-text">{loadError}</p> : null}
         </CardBody>
@@ -997,47 +1141,214 @@ function NewCourseCrossAuditView() {
           <EmptyState
             icon={ScanSearch}
             title="No cross-audit report generated yet"
-            description="Input or upload a proposed course curriculum above and click 'Run Catalog Cross-Audit & Report' to evaluate overlap against all existing department courses."
-            actionLabel="Load Sample Proposed Course (CSE 3105 ML)"
-            onAction={loadSampleProposed}
+            description="Upload a curriculum file above to evaluate overlap and similarities against all existing department courses."
+            actionLabel="Run with Sample (CSE 3105 ML)"
+            onAction={() => loadPreset(SAMPLE_PRESETS[0])}
           />
         </Card>
       ) : (
         <>
-          {/* Hero Card: Most Matched Course */}
+          {/* =================================================================
+           * HERO CARD: MOST SIMILAR COURSE IN CATALOG
+           * ================================================================= */}
           {report.most_matched_course ? (
-            <Card className="border-l-4 border-l-warning-border bg-bg-surface">
-              <CardBody className="p-4 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-wide font-semibold text-text-muted">
-                      Most Matched Existing Course in Catalog
-                    </span>
-                    <Badge variant="warning" dot>
-                      {report.most_matched_course.overlap_percentage}% Overlap Match
-                    </Badge>
-                  </div>
-                  <span className="text-xs font-mono text-text-muted">
-                    {report.most_matched_course.redundant_topics_count} Overlapping Weeks
+            <Card className="border-2 border-forest-500/60 dark:border-forest-600/60 bg-bg-surface overflow-hidden shadow-md">
+              <div className="bg-forest-50 dark:bg-forest-950/50 border-b border-forest-200 dark:border-forest-800 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-forest-600 text-white text-xs font-bold">
+                    #1
+                  </span>
+                  <span className="text-xs uppercase tracking-wider font-bold text-forest-900 dark:text-forest-200">
+                    Highest Similarity Match in Catalog
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-text-heading">
-                  {report.most_matched_course.course_code} — {report.most_matched_course.course_title}
-                </h3>
-                <p className="text-xs leading-relaxed text-text-secondary">
-                  This course in the current curriculum carries the highest topic overlap with the proposed{' '}
-                  <span className="font-semibold text-action-primary">{report.proposed_course?.code}</span> syllabus.
-                </p>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={
+                      report.most_matched_course.overlap_percentage > 40
+                        ? 'critical'
+                        : report.most_matched_course.overlap_percentage > 15
+                        ? 'warning'
+                        : 'pass'
+                    }
+                    dot
+                    className="text-xs px-2.5 py-0.5"
+                  >
+                    {report.most_matched_course.overlap_percentage}% Overlap Similarity
+                  </Badge>
+                </div>
+              </div>
+
+              <CardBody className="p-5 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-extrabold text-text-heading">
+                      {report.most_matched_course.course_code} — {report.most_matched_course.course_title}
+                    </h3>
+                    <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+                      Across all {report.catalog_matches?.length ?? 'available'} catalog courses audited, this course shares the highest degree of syllabus content and conceptual overlap with <strong className="text-text-primary">{report.proposed_course?.code} ({report.proposed_course?.title})</strong>.
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3 border border-border-default rounded-xl bg-bg-subtle/60 p-3">
+                    <div className="text-center px-2">
+                      <div className="text-lg font-bold text-text-heading">
+                        {report.most_matched_course.redundant_topics_count ?? 0}
+                      </div>
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider">
+                        Shared Weeks
+                      </div>
+                    </div>
+                    <div className="h-8 w-px bg-border-default" />
+                    <div className="text-center px-2">
+                      <div className="text-lg font-bold text-text-heading">
+                        {report.most_matched_course.missing_prerequisites_count ?? 0}
+                      </div>
+                      <div className="text-[10px] text-text-muted uppercase tracking-wider">
+                        Prereq Gaps
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overlapping Topics Detail with this Most Matched Course */}
+                {report.most_matched_course.redundant_topics?.length > 0 && (
+                  <div className="pt-3 border-t border-border-default">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">
+                      Overlapping Topics with {report.most_matched_course.course_code}:
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {report.most_matched_course.redundant_topics.map((t, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-warning-border/80 bg-warning-fill/40 p-2.5 text-xs flex flex-col justify-between"
+                        >
+                          <span className="font-semibold text-text-primary mb-1">
+                            {t.topic}
+                          </span>
+                          <div className="flex items-center justify-between text-[11px] text-text-muted mt-1 border-t border-warning-border/40 pt-1 font-mono">
+                            <span>{t.course_a_ref || report.most_matched_course.course_code}</span>
+                            <span className="text-warning-text font-bold">⇄</span>
+                            <span>{t.course_b_ref || report.proposed_course?.code}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardBody>
             </Card>
           ) : null}
+
+          {/* =================================================================
+           * CATALOG-WIDE SIMILARITY RANKING TABLE
+           * ================================================================= */}
+          <Card>
+            <CardHeader
+              icon={GitCompare}
+              title="Catalog-Wide Similarity Ranking"
+              subtitle={`Complete similarity and overlap analysis comparing ${report.proposed_course?.code || 'the uploaded curriculum'} against all ${report.catalog_matches?.length ?? 0} active department courses.`}
+            />
+            <Table>
+              <THead>
+                <TR>
+                  <TH align="left">Rank & Course</TH>
+                  <TH align="left">Similarity / Overlap</TH>
+                  <TH align="center">Overlapping Weeks</TH>
+                  <TH align="center">Prereq Gaps</TH>
+                  <TH align="right">Curriculum Verdict</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {(report.catalog_matches ?? []).map((item, idx) => {
+                  const isTop = idx === 0;
+                  const overlap = item.overlap_percentage ?? 0;
+                  return (
+                    <TR key={item.course_code} className={cn(isTop && 'bg-forest-50/40 dark:bg-forest-950/20')}>
+                      <TD className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                              isTop
+                                ? 'bg-forest-600 text-white'
+                                : 'bg-bg-subtle text-text-muted border border-border-default'
+                            )}
+                          >
+                            #{idx + 1}
+                          </span>
+                          <div>
+                            <span className="text-text-heading font-semibold">
+                              {item.course_code}
+                            </span>
+                            <span className="text-text-muted text-xs ml-1.5">
+                              — {item.course_title}
+                            </span>
+                          </div>
+                        </div>
+                      </TD>
+                      <TD className="w-48">
+                        <div className="flex items-center gap-3">
+                          <div className="w-24 bg-bg-subtle rounded-full h-2 overflow-hidden border border-border-default">
+                            <div
+                              className={cn(
+                                'h-full rounded-full transition-all',
+                                overlap > 40
+                                  ? 'bg-critical-text'
+                                  : overlap > 15
+                                  ? 'bg-warning-text'
+                                  : 'bg-forest-500'
+                              )}
+                              style={{ width: `${Math.min(100, Math.max(4, overlap))}%` }}
+                            />
+                          </div>
+                          <span
+                            className={cn(
+                              'tabular-nums font-bold text-xs',
+                              overlap > 40
+                                ? 'text-critical-text'
+                                : overlap > 15
+                                ? 'text-warning-text'
+                                : 'text-text-secondary'
+                            )}
+                          >
+                            {overlap}%
+                          </span>
+                        </div>
+                      </TD>
+                      <TD align="center" className="tabular-nums font-medium text-text-secondary">
+                        {item.redundant_topics_count ?? 0}
+                      </TD>
+                      <TD align="center" className="tabular-nums text-text-muted">
+                        {item.missing_prerequisites_count ?? 0}
+                      </TD>
+                      <TD align="right">
+                        <Badge
+                          variant={
+                            overlap > 40 ? 'critical' : overlap > 15 ? 'warning' : 'pass'
+                          }
+                          className="text-[10px]"
+                        >
+                          {overlap > 40
+                            ? 'High Overlap'
+                            : overlap > 15
+                            ? 'Moderate Overlap'
+                            : 'Distinct / Clean'}
+                        </Badge>
+                      </TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+          </Card>
 
           {/* Novel & Unique Topics Introduced */}
           <Card>
             <CardHeader
               icon={Check}
               title="Novel & Unique Topics Introduced"
-              subtitle={`Isolates ${report.novel_topics_count ?? 0} topic weeks introduced by this proposed course that do not duplicate any existing material in the current catalog.`}
+              subtitle={`Isolates ${report.novel_topics_count ?? 0} topic weeks introduced by this curriculum that do not duplicate any existing material in the current catalog.`}
             />
             <CardBody>
               {report.novel_topics?.length ? (
@@ -1063,53 +1374,9 @@ function NewCourseCrossAuditView() {
             </CardBody>
           </Card>
 
-          {/* Catalog-Wide Comparison Breakdown */}
-          <Card>
-            <CardHeader
-              icon={GitCompare}
-              title="Catalog-wide Course Comparison Matrix"
-              subtitle="Comparison breakdown against every active course in the department catalog."
-            />
-            <Table>
-              <THead>
-                <TR>
-                  <TH align="left">Course</TH>
-                  <TH align="right">Overlap Match %</TH>
-                  <TH align="right">Redundant Weeks</TH>
-                  <TH align="right">Prerequisite Gaps</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {(report.catalog_matches ?? []).map((item) => (
-                  <TR key={item.course_code}>
-                    <TD className="font-medium text-text-heading">
-                      {item.course_code} — {item.course_title}
-                    </TD>
-                    <TD align="right">
-                      <span
-                        className={cn(
-                          'tabular-nums font-semibold',
-                          item.overlap_percentage > 40 ? 'text-warning-text' : 'text-text-secondary'
-                        )}
-                      >
-                        {item.overlap_percentage}%
-                      </span>
-                    </TD>
-                    <TD align="right" className="tabular-nums text-text-secondary">
-                      {item.redundant_topics_count}
-                    </TD>
-                    <TD align="right" className="tabular-nums text-text-muted">
-                      {item.missing_prerequisites_count}
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </Card>
-
           <AiSummaryCard
             summary={report.ai_summary}
-            meta={`Proposal Audit: ${report.proposed_course?.code} ${report.proposed_course?.title}`}
+            meta={`Curriculum Audit: ${report.proposed_course?.code} ${report.proposed_course?.title}`}
           />
         </>
       )}
@@ -1122,7 +1389,7 @@ function NewCourseCrossAuditView() {
  * ======================================================================= */
 
 export default function CurriculumHarmonizerPage() {
-  const [mode, setMode] = useState('pair');
+  const [mode, setMode] = useState('catalog');
 
   const fileInputARef = useRef(null);
   const fileInputBRef = useRef(null);
@@ -1269,31 +1536,31 @@ export default function CurriculumHarmonizerPage() {
       <div className="flex items-center gap-2 border-b border-border-default pb-2">
         <button
           type="button"
-          onClick={() => setMode('pair')}
+          onClick={() => setMode('catalog')}
           className={cn(
-            'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
-            mode === 'pair'
-              ? 'bg-warning-fill text-warning-text border border-warning-border'
-              : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover'
+            'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-sm',
+            mode === 'catalog'
+              ? 'bg-action-primary text-action-primary-text border border-action-primary shadow-action-primary/20'
+              : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover border border-transparent'
           )}
         >
-          <GitCompare className="h-3.5 w-3.5" /> Course Pair Harmonization
+          <Layers className="h-4 w-4" /> Single Curriculum Catalog Match
         </button>
         <button
           type="button"
-          onClick={() => setMode('propose')}
+          onClick={() => setMode('pair')}
           className={cn(
-            'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
-            mode === 'propose'
-              ? 'bg-pass-fill text-pass-text border border-pass-border'
-              : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover'
+            'px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-sm',
+            mode === 'pair'
+              ? 'bg-action-primary text-action-primary-text border border-action-primary shadow-action-primary/20'
+              : 'text-text-muted hover:text-text-secondary hover:bg-bg-hover border border-transparent'
           )}
         >
-          <Layers className="h-3.5 w-3.5" /> Propose New Course (Catalog Cross-Audit)
+          <GitCompare className="h-4 w-4" /> Course Pair Harmonization (2 Curriculums)
         </button>
       </div>
 
-      {mode === 'propose' ? (
+      {mode === 'catalog' ? (
         <NewCourseCrossAuditView />
       ) : (
         <>

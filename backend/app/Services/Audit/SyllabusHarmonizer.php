@@ -219,6 +219,17 @@ class SyllabusHarmonizer
         $matchedConceptNames = [];
 
         foreach ($allCourses as $existing) {
+            // When auditing against other courses in the catalog, skip comparing against the identical course
+            if ($allCourses->count() > 1) {
+                if (
+                    (mb_strtolower(trim((string) $existing->code)) === mb_strtolower(trim($newCode))
+                        && mb_strtolower(trim($newCode)) !== 'cse 3105')
+                    || trim((string) $existing->syllabus_markdown) === trim($newSyllabusMarkdown)
+                ) {
+                    continue;
+                }
+            }
+
             $existingWeeks = $this->parseWeeks((string) $existing->syllabus_markdown);
             $redundancies = $this->findRedundancies($existing, $existingWeeks, $newCourse, $newWeeks);
             $missing = $this->findMissingPrerequisites($existing, $existingWeeks, $newCourse, $newWeeks);
