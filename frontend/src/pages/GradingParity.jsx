@@ -78,40 +78,64 @@ const LOADING_STEPS = [
  */
 function BatchContext({ batch, sections = [] }) {
   return (
-    <Card>
-      <div className="flex flex-col gap-4 p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-heading">
-              {batch.course_code} · {batch.assessment_name}
-            </h2>
-            <p className="mt-0.5 text-xs text-muted">
-              {batch.semester} · out of {batch.max_marks} marks · {batch.sections_submitted} sections
-              compared
-            </p>
-          </div>
-          <Badge>{GRADING_BATCH_STATUS_LABELS[batch.status] ?? batch.status}</Badge>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          {sections.map((s) => (
-            <div
-              key={s.section_name}
-              className="rounded-lg border border-border-default bg-subtle px-3 py-2"
-            >
-              <p className="text-xs font-semibold text-heading">{s.section_name}</p>
-              <p className="mt-0.5 text-[11px] text-muted">
-                Uploaded by {s.uploaded_by ?? s.instructor}
-                {s.uploaded_at
-                  ? ` · ${new Date(s.uploaded_at).toLocaleDateString(undefined, {
-                      day: 'numeric',
-                      month: 'short',
-                    })}`
-                  : ''}
-                {s.file_name ? ` · ${s.file_name}` : ''}
+    <Card className="overflow-hidden border-border-default bg-surface shadow-xs">
+      <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default/70 pb-3.5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-action-primary border border-emerald-200/80 shadow-2xs">
+              <Users className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-heading sm:text-base">
+                {batch.course_code} · {batch.assessment_name}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                {batch.semester} · Total: <span className="font-semibold text-primary">{batch.max_marks} marks</span> · <span className="font-semibold text-primary">{batch.sections_submitted} sections</span> compared
               </p>
             </div>
-          ))}
+          </div>
+          <Badge variant={batch.status === 'audited' ? 'pass' : 'info'}>
+            {GRADING_BATCH_STATUS_LABELS[batch.status] ?? batch.status}
+          </Badge>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {sections.map((s, idx) => {
+            const isSecA = s.section_name.toLowerCase().includes('a') || idx === 0;
+            return (
+              <div
+                key={s.section_name}
+                className={cn(
+                  'rounded-lg border bg-surface p-4 shadow-2xs transition-all hover:border-border-strong',
+                  isSecA
+                    ? 'border-border-default border-l-[4px] border-l-green-600'
+                    : 'border-border-default border-l-[4px] border-l-teal-600'
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className={cn('h-2.5 w-2.5 rounded-full', isSecA ? 'bg-green-600' : 'bg-teal-600')} />
+                    <p className="text-xs font-bold text-heading sm:text-sm">{s.section_name}</p>
+                  </div>
+                  <span className="rounded-md bg-subtle px-2 py-0.5 text-[11px] font-semibold text-secondary border border-border-default/60">
+                    {s.instructor ?? s.uploaded_by}
+                  </span>
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                  {s.uploaded_at ? (
+                    <span className="inline-flex items-center rounded bg-subtle/80 px-2 py-0.5 text-muted border border-border-default/40">
+                      Uploaded {new Date(s.uploaded_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    </span>
+                  ) : null}
+                  {s.file_name ? (
+                    <span className="truncate rounded bg-subtle/80 px-2 py-0.5 font-mono text-[10px] text-secondary border border-border-default/40">
+                      {s.file_name}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </Card>
@@ -459,24 +483,24 @@ export default function GradingParity() {
       {/* TOP BAR */}
       <section
         aria-label="Audit Controls"
-        className="flex flex-col gap-4 rounded-[8px] border border-border-default bg-surface p-5 sm:flex-row sm:items-center sm:justify-between shadow-elevation"
+        className="flex flex-col gap-4 rounded-[10px] border border-border-default bg-surface p-5 sm:flex-row sm:items-center sm:justify-between shadow-xs"
       >
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold tracking-tight text-heading sm:text-xl">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-lg font-extrabold tracking-tight text-heading sm:text-xl">
               Grading Parity Audit
             </h1>
             <Badge variant="info">Statistical Parity</Badge>
           </div>
-          <p className="mt-0.5 text-xs text-muted">
+          <p className="mt-1 text-xs text-muted">
             Identify section-level marker drift and evaluate mathematical normalization models.
           </p>
         </div>
 
         {/* Course Select + Action Button */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label htmlFor="course-select" className="text-xs font-medium text-muted">
+          <div className="flex items-center gap-2 rounded-lg border border-border-default bg-subtle/40 px-2.5 py-1">
+            <label htmlFor="course-select" className="text-xs font-semibold text-secondary">
               Course:
             </label>
             <select
@@ -487,7 +511,7 @@ export default function GradingParity() {
                 setSelectedCourseId(e.target.value);
                 setSelectedBatchId('');
               }}
-              className="h-9 rounded-[8px] border border-border-default bg-subtle px-3 py-1 text-xs text-primary shadow-sm focus:border-border-focus focus:outline-none disabled:opacity-50"
+              className="h-8 rounded-md border border-border-default bg-surface px-2.5 py-1 text-xs font-medium text-primary shadow-2xs focus:border-action-primary focus:outline-none focus:ring-1 focus:ring-action-primary disabled:opacity-50"
             >
               {isCoursesLoading ? (
                 <option value="">Loading courses…</option>
@@ -504,7 +528,7 @@ export default function GradingParity() {
           </div>
 
           {/* Batch Selector — the audit runs on a batch, not a course. */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-lg border border-border-default bg-subtle/40 px-2.5 py-1">
             <label htmlFor="batch-select" className="text-xs font-semibold text-secondary">
               Batch:
             </label>
@@ -513,7 +537,7 @@ export default function GradingParity() {
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
               disabled={isBatchesLoading || isPending}
-              className="h-9 rounded-[8px] border border-border-default bg-subtle px-3 py-1 text-xs text-primary shadow-sm focus:border-border-focus focus:outline-none disabled:opacity-50"
+              className="h-8 rounded-md border border-border-default bg-surface px-2.5 py-1 text-xs font-medium text-primary shadow-2xs focus:border-action-primary focus:outline-none focus:ring-1 focus:ring-action-primary disabled:opacity-50"
             >
               {isBatchesLoading ? (
                 <option>Loading batches…</option>
@@ -793,11 +817,11 @@ export default function GradingParity() {
 
               {/* Stat Strip Per Section Below Chart */}
               <div className="mt-6 space-y-3 border-t border-border-default pt-5">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted">
                   Section Statistical Summary
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {sectionStats.map((sec) => {
                     const isDeviant =
                       sec.section_name === report.normalization?.section_name ||
@@ -808,21 +832,21 @@ export default function GradingParity() {
                       <div
                         key={sec.section_name}
                         className={cn(
-                          'rounded-[8px] border p-3.5 transition-colors',
+                          'rounded-[10px] border p-4 transition-all shadow-2xs',
                           isDeviant
-                            ? 'border-critical-border bg-critical-bg'
-                            : 'border-border-default bg-subtle'
+                            ? 'border-critical-border bg-critical-bg/40 border-l-[4px] border-l-critical-text'
+                            : 'border-pass-border bg-pass-bg/40 border-l-[4px] border-l-pass-text'
                         )}
                       >
-                        <div className="flex items-center justify-between border-b border-border-default pb-2">
+                        <div className="flex items-center justify-between border-b border-border-default/80 pb-2.5">
                           <div className="flex items-center gap-2">
                             <span
                               className={cn(
-                                'h-2 w-2 rounded-full',
-                                isDeviant ? 'bg-critical-text' : 'bg-warning-text'
+                                'h-2.5 w-2.5 rounded-full',
+                                isDeviant ? 'bg-critical-text' : 'bg-pass-text'
                               )}
                             />
-                            <span className="font-semibold text-primary">
+                            <span className="font-bold text-heading sm:text-sm">
                               {sec.section_name}
                             </span>
                             <span className="text-xs text-muted">
@@ -830,63 +854,63 @@ export default function GradingParity() {
                             </span>
                           </div>
 
-                          <Badge variant={isDeviant ? 'critical' : 'warning'}>
-                            {isDeviant ? 'Deviant Marker' : 'Lenient Marker'}
+                          <Badge variant={isDeviant ? 'critical' : 'pass'}>
+                            {isDeviant ? 'Deviant Marker' : 'Conforming Marker'}
                           </Badge>
                         </div>
 
                         {/* 6 Metric Cells */}
-                        <div className="mt-2.5 grid grid-cols-3 gap-2 text-center sm:grid-cols-6">
-                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted">
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-center sm:grid-cols-6">
+                          <div className="rounded-lg bg-surface border border-border-default p-2 shadow-2xs flex flex-col justify-center">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
                               n
                             </div>
-                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
+                            <div className="mt-1 text-xs font-bold tabular-nums text-heading">
                               {sec.n}
                             </div>
                           </div>
 
-                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted">
+                          <div className="rounded-lg bg-surface border border-border-default p-2 shadow-2xs flex flex-col justify-center">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
                               Mean (μ)
                             </div>
-                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
+                            <div className="mt-1 text-xs font-bold tabular-nums text-heading">
                               {sec.mean.toFixed(1)}
                             </div>
                           </div>
 
-                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted">
+                          <div className="rounded-lg bg-surface border border-border-default p-2 shadow-2xs flex flex-col justify-center">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
                               Std Dev (σ)
                             </div>
-                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
+                            <div className="mt-1 text-xs font-bold tabular-nums text-heading">
                               {sec.std_dev.toFixed(1)}
                             </div>
                           </div>
 
-                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted">
+                          <div className="rounded-lg bg-surface border border-border-default p-2 shadow-2xs flex flex-col justify-center">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
                               Skewness
                             </div>
-                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
+                            <div className="mt-1 text-xs font-bold tabular-nums text-heading">
                               {sec.skewness.toFixed(2)}
                             </div>
                           </div>
 
-                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted">
+                          <div className="rounded-lg bg-surface border border-border-default p-2 shadow-2xs flex flex-col justify-center">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
                               Z-Score
                             </div>
-                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
+                            <div className="mt-1 text-xs font-bold tabular-nums text-heading">
                               {sec.z_score > 0 ? `+${sec.z_score.toFixed(2)}` : sec.z_score.toFixed(2)}
                             </div>
                           </div>
 
-                          <div className="rounded-[4px] bg-surface border border-border-default p-1.5">
-                            <div className="text-[10px] uppercase tracking-wider text-muted">
+                          <div className="rounded-lg bg-surface border border-border-default p-2 shadow-2xs flex flex-col justify-center">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
                               Leniency
                             </div>
-                            <div className="mt-0.5 text-xs font-bold tabular-nums text-primary">
+                            <div className="mt-1 text-xs font-bold tabular-nums text-heading">
                               {sec.leniency_index.toFixed(2)}
                             </div>
                           </div>
@@ -902,19 +926,19 @@ export default function GradingParity() {
           {/* TWO-COLUMN MIDDLE SECTION */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* DISCREPANCY INSIGHTS */}
-            <Card className="flex flex-col">
+            <Card className="flex flex-col overflow-hidden shadow-xs">
               <CardHeader
                 title="Discrepancy Insights"
                 subtitle="Algorithmic markers and statistical parity flags"
                 icon={AlertCircle}
                 action={
-                  <span className="text-xs text-muted">
+                  <Badge variant="warning">
                     {report.insights?.length ?? 0} flags
-                  </span>
+                  </Badge>
                 }
               />
 
-              <CardBody className="flex-1 space-y-3 p-4">
+              <CardBody className="flex-1 space-y-3.5 p-5">
                 {report.insights?.map((insight, idx) => {
                   const isCritical =
                     insight.severity === 'high' || insight.title.toLowerCase().includes('gap');
@@ -923,10 +947,10 @@ export default function GradingParity() {
                     <div
                       key={idx}
                       className={cn(
-                        'rounded-[8px] border p-3.5 transition-colors',
+                        'rounded-[10px] border p-4 transition-all shadow-2xs',
                         isCritical
-                          ? 'border-critical-border bg-critical-bg border-l-4 border-l-critical-text'
-                          : 'border-warning-border bg-warning-bg border-l-4 border-l-warning-text'
+                          ? 'border-critical-border bg-critical-bg/40 border-l-[4px] border-l-critical-text'
+                          : 'border-warning-border bg-warning-bg/40 border-l-[4px] border-l-warning-text'
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -936,7 +960,7 @@ export default function GradingParity() {
                         <SeverityPill severity={insight.severity} />
                       </div>
 
-                      <p className="mt-1.5 text-xs leading-relaxed text-secondary">
+                      <p className="mt-2 text-xs leading-relaxed text-secondary">
                         {insight.detail}
                       </p>
                     </div>
@@ -946,7 +970,7 @@ export default function GradingParity() {
             </Card>
 
             {/* NORMALIZATION PROPOSAL */}
-            <Card className="flex flex-col">
+            <Card className="flex flex-col overflow-hidden shadow-xs">
               <CardHeader
                 title="Normalization Proposal"
                 subtitle={`Target: ${report.normalization?.section_name ?? 'Affected Section'}`}
@@ -959,20 +983,20 @@ export default function GradingParity() {
                 }
               />
 
-              <CardBody className="flex-1 p-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+              <CardBody className="flex-1 p-5">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-12">
                   {/* Left Column: Benchmark Table */}
                   <div className="sm:col-span-7">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-primary">
+                    <div className="mb-2.5 flex items-center justify-between">
+                      <span className="text-xs font-bold text-heading">
                         Sample Mark Adjustment
                       </span>
-                      <span className="text-[11px] text-muted">
+                      <span className="text-[11px] font-semibold text-muted bg-subtle px-2 py-0.5 rounded border border-border-default/60">
                         {report.normalization?.section_name}
                       </span>
                     </div>
 
-                    <div className="rounded-[8px] border border-border-default bg-surface">
+                    <div className="overflow-hidden rounded-[10px] border border-border-default bg-surface shadow-2xs">
                       <Table>
                         <THead>
                           <TR>
@@ -991,10 +1015,10 @@ export default function GradingParity() {
                               <TD align="right" numeric className="text-xs text-muted">
                                 {row.raw}
                               </TD>
-                              <TD align="right" numeric className="text-xs font-semibold text-primary">
+                              <TD align="right" numeric className="text-xs font-bold text-heading">
                                 {row.suggested}
                               </TD>
-                              <TD align="right" numeric className="text-xs font-semibold text-pass-text">
+                              <TD align="right" numeric className="text-xs font-bold text-pass-text">
                                 <span className="inline-flex items-center gap-0.5">
                                   {row.isUp ? (
                                     <ArrowUp className="h-3 w-3 text-pass-text" />
@@ -1012,19 +1036,19 @@ export default function GradingParity() {
                   </div>
 
                   {/* Right Column: Rationale & Advisory Action */}
-                  <div className="flex flex-col justify-between rounded-[8px] border border-border-default bg-subtle p-3 sm:col-span-5">
+                  <div className="flex flex-col justify-between rounded-[10px] border border-border-default bg-subtle/60 p-4 sm:col-span-5 shadow-2xs border-t-[3.5px] border-t-action-primary">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-pass-text">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-action-primary">
                         Statistical Rationale
                       </div>
-                      <p className="mt-1.5 text-xs leading-relaxed text-secondary">
+                      <p className="mt-2 text-xs leading-relaxed text-secondary">
                         {report.normalization?.rationale}
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-border-default">
+                    <div className="mt-4 pt-3 border-t border-border-default/80">
                       <div className="mb-3 flex items-start gap-1.5 text-[11px] text-muted">
-                        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pass-text" />
+                        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-action-primary" />
                         <span>Advisory only — normalizations require official approval.</span>
                       </div>
 
