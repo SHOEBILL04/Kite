@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -9,8 +9,11 @@ import {
   BookOpen,
   CheckCircle2,
   HelpCircle,
+  Bell,
   Lock,
   Play,
+  Upload,
+  Users,
   RefreshCw,
   Scale,
   Sparkles,
@@ -28,8 +31,14 @@ import {
   YAxis,
 } from 'recharts';
 
-import { ENDPOINTS, QUERY_KEYS } from '../api/contract.js';
+import {
+  ENDPOINTS,
+  GRADING_BATCH_STATUS_LABELS,
+  MIN_SECTIONS_FOR_PARITY,
+  QUERY_KEYS,
+} from '../api/contract.js';
 import { get, post } from '../api/client.js';
+import { useAuth } from '../hooks/useAuth.js';
 import {
   AiSummaryCard,
   Badge,
@@ -57,6 +66,155 @@ const LOADING_STEPS = [
 ];
 
 // Helper to determine which bucket a numeric mean belongs to
+
+
+/**
+ * Names the batch and the people whose uploads are being compared.
+ *
+ * Parity is a comparison between colleagues' marking, so the report says whose
+ * marking, out of what total, uploaded when. Leaving the sections anonymous
+ * would make the finding harder to act on and easier to dismiss.
+ */
+function BatchContext({ batch, sections = [] }) {
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-100">
+              {batch.course_code} · {batch.assessment_name}
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {batch.semester} · out of {batch.max_marks} marks · {batch.sections_submitted} sections
+              compared
+            </p>
+          </div>
+          <Badge>{GRADING_BATCH_STATUS_LABELS[batch.status] ?? batch.status}</Badge>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {sections.map((s) => (
+            <div
+              key={s.section_name}
+              className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"
+            >
+              <p className="text-xs font-medium text-slate-200">{s.section_name}</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Uploaded by {s.uploaded_by ?? s.instructor}
+                {s.uploaded_at
+                  ? ` · ${new Date(s.uploaded_at).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                    })}`
+                  : ''}
+                {s.file_name ? ` · ${s.file_name}` : ''}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * A batch that has not collected enough sections yet.
+ *
+ * This is a normal point in the workflow, not a failure: the audit is waiting
+ * on colleagues, so it is styled informationally and says exactly who is
+ * outstanding rather than showing an error.
+ */
+function WaitingForSections({ batch }) {
+  const submitted = batch.submissions ?? [];
+  const submittedNames = new Set(submitted.map((s) => s.section_name));
+
+  // Sections we know the course has, minus the ones already in.
+  const expected = Math.max(batch.total_sections ?? MIN_SECTIONS_FOR_PARITY, MIN_SECTIONS_FOR_PARITY);
+  const outstanding = [];
+  for (let i = 0; i < expected; i += 1) {
+    const name = `Section ${String.fromCharCode(65 + i)}`;
+    if (!submittedNames.has(name)) outstanding.push(name);
+  }
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/10">
+            <Users className="h-4 w-4 text-sky-300" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-100">
+              Waiting for {outstanding.length} more section
+              {outstanding.length === 1 ? '' : 's'}
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              {batch.course_code} · {batch.assessment_name} · {batch.sections_submitted} of{' '}
+              {expected} submitted. A parity audit compares sections, so it needs at least{' '}
+              {MIN_SECTIONS_FOR_PARITY}.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-emerald-300">
+              Submitted
+            </p>
+            {submitted.length ? (
+              <ul className="space-y-1.5">
+                {submitted.map((sub) => (
+                  <li key={sub.id} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-200">{sub.section_name}</span>
+                    <span className="text-slate-500">{sub.faculty_name}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-slate-500">Nothing submitted yet.</p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-amber-300">
+              Outstanding
+            </p>
+            {outstanding.length ? (
+              <ul className="space-y-1.5">
+                {outstanding.map((name) => (
+                  <li key={name} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-200">{name}</span>
+                    <span title="Notification integration pending">
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-slate-700 px-2 py-0.5 text-[11px] text-slate-500"
+                      >
+                        <Bell className="h-3 w-3" />
+                        Remind
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-slate-500">All sections are in.</p>
+            )}
+          </div>
+        </div>
+
+        <Link
+          to="/grading-batches"
+          className="inline-flex w-fit items-center gap-1.5 text-xs font-medium text-sky-300 transition hover:text-sky-200"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          Go to Mark Collection
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 function getBucketForMean(mean, buckets = []) {
   if (!buckets.length) return null;
   for (const b of buckets) {
@@ -99,13 +257,23 @@ function CustomDistributionTooltip({ active, payload, label }) {
   );
 }
 
+/**
+ * The parity audit, open to every signed-in faculty member.
+ *
+ * Comparing sections is not privileged information here: a teacher is entitled
+ * to see how their own marking sits against the other sections of the same
+ * paper, which is the whole point of showing them the disparity.
+ */
 export default function GradingParity() {
   const [searchParams] = useSearchParams();
   const autorunParam = searchParams.get('autorun') === '1';
 
   const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [selectedBatchId, setSelectedBatchId] = useState(searchParams.get('batch') ?? '');
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
   const autoRunTriggeredRef = useRef(false);
+
+  const { user } = useAuth();
 
   // 1. Fetch courses for the course selector
   const {
@@ -119,17 +287,57 @@ export default function GradingParity() {
     queryFn: () => get(ENDPOINTS.courses),
   });
 
-  // Default to first course once loaded
+  // Batches are the real unit of a parity audit; the course selector now just
+  // narrows which batches are on offer.
+  const { data: batches, isLoading: isBatchesLoading } = useQuery({
+    queryKey: QUERY_KEYS.gradingBatches,
+    queryFn: () => get(ENDPOINTS.gradingBatches),
+  });
+
+  const batchesForCourse = useMemo(() => {
+    if (!batches) return [];
+    if (!selectedCourseId) return batches;
+    return batches.filter((b) => String(b.course_id) === String(selectedCourseId));
+  }, [batches, selectedCourseId]);
+
+  const selectedBatch = useMemo(
+    () => (batches ?? []).find((b) => String(b.id) === String(selectedBatchId)) ?? null,
+    [batches, selectedBatchId]
+  );
+
+  // Default to the first course once loaded.
   useEffect(() => {
     if (courses && courses.length > 0 && !selectedCourseId) {
       setSelectedCourseId(String(courses[0].id));
     }
   }, [courses, selectedCourseId]);
 
+  // A ?batch= in the URL wins; otherwise pick the newest batch that can
+  // actually be audited, so the page opens on something runnable.
+  useEffect(() => {
+    if (selectedBatchId || batchesForCourse.length === 0) return;
+    const runnable = batchesForCourse.find(
+      (b) => (b.sections_submitted ?? 0) >= MIN_SECTIONS_FOR_PARITY
+    );
+    setSelectedBatchId(String((runnable ?? batchesForCourse[0]).id));
+  }, [batchesForCourse, selectedBatchId]);
+
+  // Keep the course selector in step with a batch arriving from the URL.
+  useEffect(() => {
+    if (selectedBatch && String(selectedBatch.course_id) !== String(selectedCourseId)) {
+      setSelectedCourseId(String(selectedBatch.course_id));
+    }
+  }, [selectedBatch, selectedCourseId]);
+
   // 2. Audit Mutation
   const auditMutation = useMutation({
-    mutationFn: (courseId) =>
-      post(ENDPOINTS.auditGradingDrift, { course_id: Number(courseId) }),
+    // Prefer the batch; fall back to the course so the seeded demo path and any
+    // deep link without a batch id still run.
+    mutationFn: ({ batchId, courseId }) =>
+      post(
+        ENDPOINTS.auditGradingDrift,
+        batchId ? { grading_batch_id: Number(batchId) } : { course_id: Number(courseId) }
+      ),
   });
 
   // Cycle rotating status text during loading
@@ -145,16 +353,25 @@ export default function GradingParity() {
   }, [auditMutation.isPending]);
 
   // 3. Auto-run if ?autorun=1 is in the URL on mount
+  const canRun =
+    !selectedBatch || (selectedBatch.sections_submitted ?? 0) >= MIN_SECTIONS_FOR_PARITY;
+
   useEffect(() => {
-    if (autorunParam && selectedCourseId && !autoRunTriggeredRef.current && !auditMutation.isPending) {
+    if (
+      autorunParam &&
+      (selectedBatchId || selectedCourseId) &&
+      canRun &&
+      !autoRunTriggeredRef.current &&
+      !auditMutation.isPending
+    ) {
       autoRunTriggeredRef.current = true;
-      auditMutation.mutate(selectedCourseId);
+      auditMutation.mutate({ batchId: selectedBatchId, courseId: selectedCourseId });
     }
-  }, [autorunParam, selectedCourseId, auditMutation]);
+  }, [autorunParam, selectedBatchId, selectedCourseId, canRun, auditMutation]);
 
   const handleRunAudit = () => {
-    if (!selectedCourseId) return;
-    auditMutation.mutate(selectedCourseId);
+    if (!selectedBatchId && !selectedCourseId) return;
+    auditMutation.mutate({ batchId: selectedBatchId, courseId: selectedCourseId });
   };
 
   const report = auditMutation.data;
@@ -286,17 +503,51 @@ export default function GradingParity() {
             </select>
           </div>
 
+          {/* Batch Selector — the audit runs on a batch, not a course. */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="batch-select" className="text-xs font-medium text-slate-400">
+              Batch:
+            </label>
+            <select
+              id="batch-select"
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+              disabled={isBatchesLoading || isPending}
+              className="h-8 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-200 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-50"
+            >
+              {isBatchesLoading ? (
+                <option>Loading batches…</option>
+              ) : batchesForCourse.length === 0 ? (
+                <option value="">No batches for this course</option>
+              ) : (
+                batchesForCourse.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.assessment_name} · {b.sections_submitted}/{b.total_sections} sections
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
           {/* Run Button */}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleRunAudit}
-            loading={isPending}
-            disabled={!selectedCourseId || isPending}
-            icon={Play}
+          <span
+            title={
+              canRun
+                ? 'Run the cross-section parity audit'
+                : `Parity compares sections — at least ${MIN_SECTIONS_FOR_PARITY} must submit first.`
+            }
           >
-            Run Parity Audit
-          </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleRunAudit}
+              loading={isPending}
+              disabled={(!selectedCourseId && !selectedBatchId) || isPending || !canRun}
+              icon={Play}
+            >
+              Run Parity Audit
+            </Button>
+          </span>
 
           {/* Verdict / Severity Badge once results land */}
           {report ? (
@@ -396,11 +647,15 @@ export default function GradingParity() {
       {/* ====================================================================
        * STATE 3: IDLE (Before first run)
        * ==================================================================== */}
-      {!report && !isPending && !isError ? (
+      {!report && !isPending && !isError && !canRun && selectedBatch ? (
+        <WaitingForSections batch={selectedBatch} />
+      ) : null}
+
+      {!report && !isPending && !isError && canRun ? (
         <Card>
           <EmptyState
             title="Grading Parity Audit Ready"
-            description="Select a course and click 'Run Parity Audit' to evaluate marker bias, distribution skewness, and generate recommended grade adjustments between parallel sections."
+            description="Select a batch and click 'Run Parity Audit' to evaluate marker bias, distribution skewness, and generate recommended grade adjustments between parallel sections."
             icon={Scale}
             actionLabel="Run Parity Audit Now"
             onAction={handleRunAudit}
@@ -413,6 +668,11 @@ export default function GradingParity() {
        * ==================================================================== */}
       {report && !isPending ? (
         <div className="space-y-6">
+          {/* ----------------------------------------------------------------
+           * A0. BATCH CONTEXT — whose uploads this audit is actually about
+           * ---------------------------------------------------------------- */}
+          {report.batch ? <BatchContext batch={report.batch} sections={sectionStats} /> : null}
+
           {/* ----------------------------------------------------------------
            * A. DISTRIBUTION COMPARISON (The Hero Visual)
            * ---------------------------------------------------------------- */}

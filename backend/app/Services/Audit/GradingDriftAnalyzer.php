@@ -307,17 +307,23 @@ class GradingDriftAnalyzer
 
         try {
             $aiResponse = $this->aiClient->run('grading-drift', $system, $user, $schema);
+
+            // A fixture is one recorded batch's insights and prose. Handed back
+            // for a different batch it names the wrong sections and the wrong
+            // gap, so it is discarded in favour of the deterministic text built
+            // from this batch's own statistics.
+            if (! empty($aiResponse[AiClient::FROM_FIXTURE])) {
+                return ['insights' => [], 'ai_summary' => ''];
+            }
+
             return [
                 'insights' => $aiResponse['insights'] ?? [],
                 'ai_summary' => $aiResponse['ai_summary'] ?? '',
             ];
         } catch (Throwable $e) {
             Log::warning("GradingDriftAnalyzer AI synthesis failed: " . $e->getMessage());
-            $fixture = $this->aiClient->loadFixture('grading-drift');
-            return [
-                'insights' => $fixture['insights'] ?? [],
-                'ai_summary' => $fixture['ai_summary'] ?? '',
-            ];
+
+            return ['insights' => [], 'ai_summary' => ''];
         }
     }
 

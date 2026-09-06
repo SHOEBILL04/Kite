@@ -283,15 +283,19 @@ class ExamModerator
         ];
 
         try {
-            return $this->aiClient->run('exam-moderation', $system, $user, $schema);
+            $result = $this->aiClient->run('exam-moderation', $system, $user, $schema);
+
+            // A fixture describes the one paper it was frozen from, so its
+            // levels, rewrites and prose say nothing about this paper. Drop
+            // them and let the deterministic path speak from what was measured.
+            if (! empty($result[AiClient::FROM_FIXTURE])) {
+                return ['detected_levels' => [], 'duplicate_rewrites' => [], 'additional_flags' => [], 'ai_summary' => ''];
+            }
+
+            return $result;
         } catch (Throwable $e) {
             Log::warning("ExamModerator AI synthesis failed: " . $e->getMessage());
-            $fixture = $this->aiClient->loadFixture('exam-moderation');
-            return [
-                'detected_levels' => ['2(a)' => 'C1', '5(b)' => 'C5'],
-                'duplicate_rewrites' => ['4' => $fixture['duplicates'][0]['rewrite_suggestion'] ?? ''],
-                'ai_summary' => $fixture['ai_summary'] ?? '',
-            ];
+            return ['detected_levels' => [], 'duplicate_rewrites' => [], 'additional_flags' => [], 'ai_summary' => ''];
         }
     }
 

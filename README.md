@@ -38,9 +38,8 @@ npm run dev                          # http://localhost:5173
 
 Sign in with the one-click judge button, or `monir@aust.edu` / `password`.
 
-No API key is required. With `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`/`GROQ_API_KEY`
-unset the app runs the full audit and explains it with deterministic prose —
-see *AI failover chain* below.
+No API key is required. With `GROQ_API_KEY` unset the app runs the full audit
+and explains it with deterministic prose — see *AI failover chain* below.
 
 ---
 
@@ -75,8 +74,8 @@ see *AI failover chain* below.
 │                                                                          │
 │  ┌────────────────────── AiClient (explanation only) ─────────────────┐  │
 │  │  1. ai_cache (SQLite, prompt-hash keyed)                           │  │
-│  │  2. Gemini      ─ primary driver                                   │  │
-│  │  3. Groq        ─ fallback driver                                  │  │
+│  │  2. Groq  llama-3.3-70b-versatile  ─ primary                       │  │
+│  │  3. Groq  llama-3.1-8b-instant     ─ on 429 / 5xx                  │  │
 │  │  4. schema validation + one repair attempt                         │  │
 │  │  5. storage/app/fixtures/*.json                                    │  │
 │  │  6. deterministic PHP prose  ← always reachable, never throws      │  │
@@ -129,46 +128,89 @@ because it is never in the position to produce one.
 
 ## AI failover chain
 
-`AiClient::run()` walks six tiers in order and **never throws to the caller**:
+**Groq (Llama) is the only LLM provider.** `AiClient::run()` walks five tiers in
+order and **never throws to the caller**:
 
 | # | Tier | When it serves | `meta.source` |
 | --- | --- | --- | --- |
 | 1 | `ai_cache` (SQLite, keyed by prompt hash) | the same audit ran before | `cached` |
-| 2 | Fixture short-circuit | `AI_MODE=fixture`, or no key configured | `fixture` |
-| 3 | **Gemini** — primary driver | a key is set and the call succeeds | `live` |
-| 4 | **Groq (LLaMA 3.3)** — fallback | Gemini errors, times out, or rate-limits | `live` |
-| 5 | Schema validation + one repair retry | the reply is missing required keys | `live` |
-| 6 | `storage/app/fixtures/*.json`, then deterministic PHP prose | everything above failed | `fixture` |
+| 2 | Fixture short-cut | `AI_MODE=fixture`/`cache_only`, or no key set | `fixture` |
+| 3 | **Groq primary** — `llama-3.3-70b-versatile` | a key is set and the call succeeds | `live` |
+| 4 | **Groq fallback** — `llama-3.1-8b-instant` | primary is rate-limited or 5xx | `live` |
+| 5 | `storage/app/fixtures/*.json`, then deterministic PHP prose | everything above failed | `fixture` |
 
-Every attempt is written to `ai_runs` with driver, token counts, latency and
-error, so the failover is inspectable after the fact rather than a claim.
+Every attempt is written to `ai_runs` with driver, model, token counts, latency
+and error, so the failover is inspectable rather than a claim.
 
-The top-bar **ApiStatus** badge reports which tier served the request you are
-looking at, live:
+### Free-tier limits shape the design
 
-- 🟢 **Live** — a model call was made
-- 🔵 **Cached** — served from the warm cache
-- 🟡 **Fixture** — no model reachable; recorded findings
-- ⚪ **Deterministic** — no AI involved at all (pure PHP endpoint)
+Groq's free tier allows **30 requests/minute and 14,400/day at the organization
+level** — extra API keys do not raise it. Two consequences are baked in:
+
+- **Every service makes exactly one AI call per run.** All flagged students in
+  one request, all questions in one request. There is no per-item loop anywhere
+  in the audit path; `ai:warm` additionally spaces its calls 2.5s apart.
+- **429 is treated as routine, not exceptional.** The driver reads `retry-after`
+  and the `x-ratelimit-*` headers, backs off 1s → 2s → 4s over three attempts,
+  then retries once on the lighter fallback model before giving up. Every 429 is
+  logged to `ai_runs` with its rate-limit headers.
+
+### Working around Groq's JSON handling
+
+Groq's OpenAI-compatible layer has **no JSON schema parameter** — `json_object`
+mode guarantees syntactically valid JSON and nothing about its shape. So:
+
+- the schema is appended to the **end** of the system message as an explicit
+  contract (Llama weights recency heavily), with the instruction *"Respond with
+  a single valid JSON object matching this schema exactly. No markdown fences,
+  no commentary, no preamble."*;
+- ```` ```json ```` fences are stripped defensively before decoding — Llama
+  still emits them occasionally despite `json_object` mode;
+- the decoded object is validated for required keys and array-typed fields; on
+  mismatch there is **one** repair call echoing the invalid output back, and
+  then the chain falls through to fixture.
+
+Every audit prompt carries one complete worked example and uses imperatives
+rather than soft phrasing, at `temperature 0.2`.
+
+### Configuration
+
+```bash
+AI_PROVIDER=groq
+AI_MODE=live                 # live | cache_only | fixture
+GROQ_API_KEY=                # empty in .env.example — never commit a key
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_FALLBACK_MODEL=llama-3.1-8b-instant
+GROQ_TIMEOUT=45              # a 70B model on a long prompt is not fast
+EMBEDDING_PROVIDER=none      # none | local
+```
+
+`backend/.env` is gitignored; no key is hardcoded in any PHP file, config,
+seeder, test or fixture — everything reads from `env()`.
+
+Diagnose a key or model-name problem in seconds:
+
+```bash
+php artisan ai:test          # one minimal request: model, latency, tokens, parsed response
+```
+
+### Two known trade-offs, stated plainly
+
+**Scanned PDFs are not supported.** Groq's Llama models are text-only and cannot
+accept a PDF. Paper ingestion extracts text server-side with `smalot/pdfparser`;
+if fewer than 200 characters come out, the file is treated as a scanned image
+and the upload fails loudly — *"This PDF appears to be scanned. Paste the
+question text manually instead."* — routing the user into Paste Text mode rather
+than silently producing garbage.
+
+**Groq has no embedding endpoint.** `EMBEDDING_PROVIDER` selects the strategy:
+`none` (the default) means similarity comparison runs on Jaccard token overlap
+alone and reports `method: 'lexical_only'` so the UI can say so honestly;
+`local` reads precomputed vectors from `storage/app/embeddings/*.json` generated
+offline, with no runtime API call. Similarity never throws when embeddings are
+absent — it degrades to the lexical score.
 
 ### Verified kill-switch
-
-`mv .env .env.bak` and every module still answers:
-
-```
-  ✓ grading-drift          HTTP 200  source=fixture   full report
-  ✓ syllabus               HTTP 200  source=fixture   full report
-  ✓ exam-moderation        HTTP 200  source=fixture   full report
-  ✓ vulnerable-students    HTTP 200  source=fixture   full report
-
-KILL-SWITCH PASSED: all four modules served full results with no .env
-```
-
-Re-run it yourself with `php scripts/killswitch_check.php` (after renaming
-`.env`). Measured warm latency, all modules: **under 10 ms**, budget 300 ms
-(`php scripts/latency_check.php`).
-
----
 
 ## ML model card — student risk
 
@@ -267,8 +309,8 @@ before presenting.
 backend/
   app/Services/Audit/       GradingDriftAnalyzer · SyllabusHarmonizer · ExamModerator
   app/Services/Risk/        RuleEngine · MlScorer · RiskAnalyzer
-  app/Services/Ai/          AiClient · GeminiDriver · GroqDriver · AiTelemetry
-  app/Console/Commands/     ai:warm · ai:fixtures:dump · demo:verify
+  app/Services/Ai/          AiClient · GroqDriver · AiTelemetry
+  app/Console/Commands/     ai:test · ai:warm · ai:fixtures:dump · demo:verify
   storage/app/ml/           risk_model.json   (committed — required at runtime)
   storage/app/fixtures/     frozen reports    (committed — offline serving)
   train_risk_model.py       offline trainer; not a runtime dependency

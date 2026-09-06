@@ -7,6 +7,7 @@ import {
   LogOut,
   Radar,
   Scale,
+  Upload,
 } from 'lucide-react';
 import { cn } from '../../lib/cn.js';
 import { initials } from '../../lib/format.js';
@@ -21,6 +22,7 @@ import { ApiStatus, Badge, Button } from '../ui/index.js';
  */
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', title: 'Dashboard', icon: LayoutDashboard },
+  { to: '/grading-batches', label: 'Mark Collection', title: 'Mark Collection', icon: Upload },
   { to: '/grading-parity', label: 'Grading Parity', title: 'Grading Parity Audit', icon: Scale },
   { to: '/exam-moderation', label: 'Exam Moderation', title: 'Exam Moderation', icon: FileSearch },
   {

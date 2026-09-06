@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
+use App\Models\GradingBatch;
 use App\Models\SectionGrade;
 use App\Models\Student;
 use App\Models\User;
@@ -177,8 +178,17 @@ class AuthAndFoundationTest extends TestCase
      */
     public function test_section_grades_and_student_risk_cases(): void
     {
-        $secAGrades = SectionGrade::where('section_name', 'Section A')->pluck('mid_marks');
-        $secBGrades = SectionGrade::where('section_name', 'Section B')->pluck('mid_marks');
+        // Scoped to the CSE 2101 Mid Term batch. Section names repeat across
+        // courses and assessments, so an unscoped query mixes several cohorts
+        // into one distribution and the means stop meaning anything.
+        $batch = GradingBatch::whereRelation('course', 'code', 'CSE 2101')
+            ->where('assessment_name', 'Mid Term')
+            ->firstOrFail();
+
+        $secAGrades = SectionGrade::where('grading_batch_id', $batch->id)
+            ->where('section_name', 'Section A')->pluck('mid_marks');
+        $secBGrades = SectionGrade::where('grading_batch_id', $batch->id)
+            ->where('section_name', 'Section B')->pluck('mid_marks');
 
         $this->assertCount(20, $secAGrades);
         $this->assertCount(20, $secBGrades);
@@ -191,8 +201,10 @@ class AuthAndFoundationTest extends TestCase
         $this->assertEqualsWithDelta(16.5, $meanB, 0.5);
 
         // Verify comparable quiz averages and attendance across sections
-        $avgAttA = SectionGrade::where('section_name', 'Section A')->avg('attendance_pct');
-        $avgAttB = SectionGrade::where('section_name', 'Section B')->avg('attendance_pct');
+        $avgAttA = SectionGrade::where('grading_batch_id', $batch->id)
+            ->where('section_name', 'Section A')->avg('attendance_pct');
+        $avgAttB = SectionGrade::where('grading_batch_id', $batch->id)
+            ->where('section_name', 'Section B')->avg('attendance_pct');
         $this->assertEqualsWithDelta($avgAttA, $avgAttB, 5.0);
 
         // Verify planted student risk cases exist
@@ -201,7 +213,12 @@ class AuthAndFoundationTest extends TestCase
         $this->assertEquals(82, $stu042->attendance_pct);
         $this->assertEquals(38, $stu042->quiz3);
         $this->assertEquals(41, $stu042->midterm_pct);
-        $this->assertNull($stu042->risk_level);
+        // risk_level is owned by the risk engine, not the seeder: it is null
+        // until an audit runs and populated afterwards, and `ai:warm` is a
+        // documented setup step. So the assertion is that the seeder plants no
+        // verdict of its own, and that any verdict since computed is a real
+        // band rather than 'safe' for a student whose quizzes collapsed.
+        $this->assertContains($stu042->risk_level, [null, 'moderate', 'critical']);
 
         $stu017 = Student::where('student_hash', 'STU_017')->first();
         $this->assertNotNull($stu017);

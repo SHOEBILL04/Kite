@@ -173,11 +173,7 @@ class AuditController extends Controller
         }
 
         $reports = AuditReport::latest()->take(6)->get()->map(function ($r) {
-            $subject = 'General Academic Audit';
-            if ($r->module === 'grading') $subject = 'CSE 2101 · Section A vs B';
-            if ($r->module === 'exam') $subject = 'CSE 2101 · Fall 2025 Final (draft)';
-            if ($r->module === 'syllabus') $subject = 'CSE 2101 → CSE 2103';
-            if ($r->module === 'student_risk') $subject = 'CSE 2101 · all sections';
+            $subject = $this->reportSubject($r);
 
             return [
                 'id' => $r->id,
@@ -210,6 +206,39 @@ class AuditController extends Controller
                 'recent_reports' => $recent,
             ]
         ]);
+    }
+
+
+    /**
+     * Names what a report is about, from the record it was actually run on.
+     *
+     * This used to be four hard-coded CSE 2101 strings, which read correctly
+     * only while CSE 2101 was the sole audited course. With reports on several
+     * courses in the list, a fixed label puts the wrong course code beside real
+     * findings, so the subject is derived from the auditable morph and the
+     * hard-coded text survives only as the last resort.
+     */
+    private function reportSubject(AuditReport $report): string
+    {
+        $auditable = $report->auditable;
+
+        if ($auditable instanceof Exam) {
+            $code = $auditable->course?->code ?? 'Unknown course';
+
+            return sprintf('%s · %s %s (%s)', $code, $auditable->semester, $auditable->exam_type, $auditable->status);
+        }
+
+        if ($auditable instanceof Course) {
+            return match ($report->module) {
+                'grading' => $auditable->code.' · section comparison',
+                'exam' => $auditable->code.' · draft paper',
+                'syllabus' => $auditable->code.' · prerequisite pairing',
+                'student_risk' => $auditable->code.' · all sections',
+                default => $auditable->code,
+            };
+        }
+
+        return 'General Academic Audit';
     }
 
     /**
@@ -264,11 +293,7 @@ class AuditController extends Controller
         }
 
         $reports = $query->latest()->get()->map(function ($r) {
-            $subject = 'General Academic Audit';
-            if ($r->module === 'grading') $subject = 'CSE 2101 · Section A vs B';
-            if ($r->module === 'exam') $subject = 'CSE 2101 · Fall 2025 Final (draft)';
-            if ($r->module === 'syllabus') $subject = 'CSE 2101 → CSE 2103';
-            if ($r->module === 'student_risk') $subject = 'CSE 2101 · all sections';
+            $subject = $this->reportSubject($r);
 
             return [
                 'id' => $r->id,
