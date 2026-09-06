@@ -219,6 +219,7 @@ class AuthAndFoundationTest extends TestCase
         // verdict of its own, and that any verdict since computed is a real
         // band rather than 'safe' for a student whose quizzes collapsed.
         $this->assertContains($stu042->risk_level, [null, 'moderate', 'critical']);
+        $this->assertTrue(is_null($stu042->risk_level) || in_array($stu042->risk_level, ['low', 'medium', 'high', 'critical']));
 
         $stu017 = Student::where('student_hash', 'STU_017')->first();
         $this->assertNotNull($stu017);

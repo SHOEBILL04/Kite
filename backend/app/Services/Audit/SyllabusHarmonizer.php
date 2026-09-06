@@ -150,6 +150,192 @@ class SyllabusHarmonizer
     }
 
     /**
+     * Audit custom uploaded syllabi markdown.
+     */
+    public function harmoniseCustom(
+        string $syllabusAMarkdown,
+        string $syllabusBMarkdown,
+        string $codeA = 'Course A',
+        string $codeB = 'Course B'
+    ): array {
+        $courseA = new Course(['code' => $codeA, 'title' => $codeA, 'syllabus_markdown' => $syllabusAMarkdown]);
+        $courseB = new Course(['code' => $codeB, 'title' => $codeB, 'syllabus_markdown' => $syllabusBMarkdown]);
+
+        $weeksA = $this->parseWeeks($syllabusAMarkdown);
+        $weeksB = $this->parseWeeks($syllabusBMarkdown);
+
+        $redundantTopics = $this->findRedundancies($courseA, $weeksA, $courseB, $weeksB);
+        $missingPrerequisites = $this->findMissingPrerequisites($courseA, $weeksA, $courseB, $weeksB);
+        $bloomCoverage = $this->bloomCoverage($weeksA, $weeksB);
+
+        $alignmentScore = (int) max(0, min(100,
+            100 - (count($redundantTopics) * 8) - (count($missingPrerequisites) * 12)
+        ));
+
+        $actionableChanges = $this->actionableChanges($courseA, $courseB, $redundantTopics, $missingPrerequisites);
+
+        return [
+            'alignment_score' => $alignmentScore,
+            'redundant_topics' => $redundantTopics,
+            'missing_prerequisites' => $missingPrerequisites,
+            'bloom_coverage' => $bloomCoverage,
+            'actionable_changes' => $actionableChanges,
+            'ai_summary' => $this->summarise(
+                $courseA, $courseB, $alignmentScore, $redundantTopics, $missingPrerequisites
+            ),
+        ];
+    }
+
+    /**
+     * Cross-audit a newly proposed course curriculum against all existing courses in the catalog.
+     *
+     * @param string $newSyllabusMarkdown
+     * @param string $newCode
+     * @param string $newTitle
+     * @return array Matches NewCourseCrossAuditReport
+     */
+    public function crossAuditNewCourse(
+        string $newSyllabusMarkdown,
+        string $newCode = 'CSE 3105',
+        string $newTitle = 'Machine Learning'
+    ): array {
+        $newCourse = new Course([
+            'code' => $newCode,
+            'title' => $newTitle,
+            'syllabus_markdown' => $newSyllabusMarkdown,
+        ]);
+
+        $newWeeks = $this->parseWeeks($newSyllabusMarkdown);
+        $allCourses = Course::all();
+
+        if ($allCourses->isEmpty()) {
+            $allCourses = collect([
+                new Course(['id' => 1, 'code' => 'CSE 2101', 'title' => 'Data Structures', 'syllabus_markdown' => "### Weekly Topic Breakdown\n- **Week 1:** Complexity Analysis\n- **Week 2:** Recursion\n- **Week 3:** Divide and Conquer\n- **Week 9:** Binary Trees\n- **Week 10:** Binary Search Trees"]),
+                new Course(['id' => 2, 'code' => 'CSE 2103', 'title' => 'Algorithms', 'syllabus_markdown' => "### Weekly Topic Breakdown\n- **Week 1:** Complexity Analysis\n- **Week 2:** Recursion\n- **Week 4:** Heaps\n- **Week 6:** Graph Traversal\n- **Week 8:** Dynamic Programming"]),
+            ]);
+        }
+
+        $catalogMatches = [];
+        $matchedConceptNames = [];
+
+        foreach ($allCourses as $existing) {
+            $existingWeeks = $this->parseWeeks((string) $existing->syllabus_markdown);
+            $redundancies = $this->findRedundancies($existing, $existingWeeks, $newCourse, $newWeeks);
+            $missing = $this->findMissingPrerequisites($existing, $existingWeeks, $newCourse, $newWeeks);
+
+            $overlapCount = count($redundancies);
+            $totalNewWeeks = max(1, count($newWeeks));
+            $overlapPct = (int) round(($overlapCount / $totalNewWeeks) * 100);
+
+            $catalogMatches[] = [
+                'course_id' => $existing->id ?? null,
+                'course_code' => $existing->code,
+                'course_title' => $existing->title,
+                'overlap_percentage' => $overlapPct,
+                'redundant_topics_count' => $overlapCount,
+                'missing_prerequisites_count' => count($missing),
+                'redundant_topics' => $redundancies,
+                'missing_prerequisites' => $missing,
+            ];
+
+            foreach ($redundancies as $r) {
+                $matchedConceptNames[] = mb_strtolower($r['topic']);
+            }
+        }
+
+        usort($catalogMatches, fn ($x, $y) => $y['overlap_percentage'] <=> $x['overlap_percentage']);
+        $mostMatched = $catalogMatches[0] ?? null;
+
+        $novelTopics = [];
+        foreach ($newWeeks as $nw) {
+            $concepts = $this->conceptsIn($nw['norm']);
+            $isOverlap = false;
+            foreach ($concepts as $c) {
+                if (in_array(mb_strtolower($c), $matchedConceptNames, true)) {
+                    $isOverlap = true;
+                    break;
+                }
+            }
+            if (! $isOverlap) {
+                $novelTopics[] = [
+                    'week' => $nw['week'],
+                    'label' => $nw['label'],
+                    'topic' => $nw['text'],
+                ];
+            }
+        }
+
+        $bloomCoverage = $this->bloomCoverage($newWeeks, []);
+
+        $aiSummary = $this->summariseNewCourseProposal(
+            $newCode,
+            $newTitle,
+            $mostMatched,
+            $catalogMatches,
+            $novelTopics
+        );
+
+        return [
+            'proposed_course' => [
+                'code' => $newCode,
+                'title' => $newTitle,
+                'weeks_count' => count($newWeeks),
+            ],
+            'most_matched_course' => $mostMatched,
+            'catalog_matches' => $catalogMatches,
+            'novel_topics' => $novelTopics,
+            'novel_topics_count' => count($novelTopics),
+            'bloom_coverage' => $bloomCoverage,
+            'ai_summary' => $aiSummary,
+        ];
+    }
+
+    private function summariseNewCourseProposal(
+        string $code,
+        string $title,
+        ?array $mostMatched,
+        array $catalogMatches,
+        array $novelTopics
+    ): string {
+        $mostMatchedStr = $mostMatched
+            ? sprintf('%s (%s) with %d%% overlap', $mostMatched['course_code'], $mostMatched['course_title'], $mostMatched['overlap_percentage'])
+            : 'None';
+
+        $deterministic = sprintf(
+            'Proposed course %s (%s) introduces %d novel topics. It has highest overlap with %s.',
+            $code, $title, count($novelTopics), $mostMatchedStr
+        );
+
+        try {
+            $ai = $this->aiClient->run(
+                'syllabus',
+                'You are a university curriculum evaluation expert. Write a brief executive summary (2-3 sentences) evaluating the introduction of a new proposed course into the departmental curriculum. '
+                    .'Reference ONLY the supplied findings. Highlight the most matched existing course, overlap percentage, and unique novel material introduced.',
+                json_encode([
+                    'proposed_course' => $code.' - '.$title,
+                    'most_matched_course' => $mostMatchedStr,
+                    'novel_topics_count' => count($novelTopics),
+                    'sample_novel_topics' => array_slice(array_column($novelTopics, 'topic'), 0, 4),
+                ], JSON_PRETTY_PRINT),
+                [
+                    'type' => 'object',
+                    'required' => ['ai_summary'],
+                    'properties' => ['ai_summary' => ['type' => 'string']],
+                ]
+            );
+
+            $summary = trim((string) ($ai['ai_summary'] ?? ''));
+            if ($summary !== '' && ! str_contains(mb_strtolower($summary), 'default system fallback')) {
+                return $summary;
+            }
+        } catch (Throwable $e) {
+            Log::warning('New course proposal AI summary failed: '.$e->getMessage());
+        }
+
+        return $deterministic;
+    }
+
+    /**
      * Split a syllabus into week entries.
      *
      * Annotations wrapped in *( ... )* are stripped before any matching. The
@@ -161,24 +347,39 @@ class SyllabusHarmonizer
     private function parseWeeks(string $markdown): array
     {
         $weeks = [];
+        $lines = explode("\n", $markdown);
+        $weekIndex = 1;
 
-        foreach (explode("\n", $markdown) as $line) {
-            if (! preg_match('/^\s*[-*]\s*\*\*Week\s+(\d+)[:.]?\*\*\s*(.+)$/i', trim($line), $m)) {
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if (! $trimmed || str_starts_with($trimmed, '#')) {
                 continue;
             }
 
-            $text = $m[2];
+            $weekNum = $weekIndex;
+            $text = $trimmed;
+
+            if (preg_match('/^\s*[-*]?\s*\*\*?Week\s+(\d+)[:.]?\*\*?\s*(.+)$/i', $trimmed, $m)) {
+                $weekNum = (int) $m[1];
+                $text = $m[2];
+            } elseif (preg_match('/^\s*[-*]\s*(.+)$/', $trimmed, $m)) {
+                $text = $m[1];
+            }
+
             $text = preg_replace('/\*\([^)]*\)\*/', '', $text);   // drop *( ... )* annotations
             $text = preg_replace('/\$[^$]*\$/', ' ', $text);       // drop inline LaTeX
             $text = str_replace(['**', '*', '[', ']'], ' ', $text);
             $text = trim(preg_replace('/\s+/', ' ', $text));
 
-            $weeks[] = [
-                'week' => (int) $m[1],
-                'label' => 'Week '.$m[1],
-                'text' => $text,
-                'norm' => mb_strtolower($text),
-            ];
+            if ($text !== '') {
+                $weeks[] = [
+                    'week' => $weekNum,
+                    'label' => 'Week '.$weekNum,
+                    'text' => $text,
+                    'norm' => mb_strtolower($text),
+                ];
+                $weekIndex++;
+            }
         }
 
         return $weeks;

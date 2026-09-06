@@ -118,5 +118,5 @@
         "higher_order_pct": 41.7,
         "verdict": "warning"
     },
-    "ai_summary": "Moderation flagged 3 issue group(s): the question marks sum to 72 against a declared total of 70; 1 question(s) repeat a past paper (Q4); 5 question(s) are labelled at a cognitive level the wording does not support. Cognitive balance is 58.3% lower-order against 41.7% higher-order (warning)."
+    "ai_summary": "The Fall 2025 draft Final is not ready for approval. Question marks sum to 72 against a declared total of 70, so every script would be graded on an inconsistent denominator. Q4 is a 0.97 verbatim match against the Fall 2024 Final, a paper students already hold. Q2(a) asks students to \"state\" and \"list\" — pure C1 recall — while carrying a C4 tag, inflating the paper apparent analytical weight by 8 marks. Q5(b) allocates 2 marks to a derive-and-prove task worth an estimated 20 minutes. Cognitive balance is 58.3% lower-order to 41.7% higher-order, with no C5 or C6 question anywhere on the paper, so the highest-order CLOs go unassessed this semester."
 }

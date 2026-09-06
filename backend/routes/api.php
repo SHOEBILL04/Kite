@@ -52,6 +52,7 @@ Route::get('/reports', [AuditController::class, 'reports']);
 // Audit Engines
 Route::post('/audit/grading-drift', [AuditController::class, 'gradingDrift']);
 Route::post('/audit/syllabus', [AuditController::class, 'syllabus']);
+Route::post('/audit/syllabus/cross-audit', [AuditController::class, 'crossAudit']);
 Route::post('/audit/exam-moderation', [AuditController::class, 'examModeration']);
 Route::post('/audit/vulnerable-students', VulnerableStudentController::class);
 

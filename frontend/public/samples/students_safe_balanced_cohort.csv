@@ -1,0 +1,16 @@
+student_hash,section_name,attendance_pct,quiz1,quiz2,quiz3,midterm_pct,assignment_delay_count
+STU_SAFE_001,Section A,94,88,90,92,88.0,0
+STU_SAFE_002,Section A,90,82,85,84,85.0,0
+STU_SAFE_003,Section A,88,78,80,82,80.0,0
+STU_SAFE_004,Section A,92,85,84,86,87.0,0
+STU_SAFE_005,Section A,96,92,94,95,92.0,0
+STU_SAFE_006,Section A,86,76,80,82,81.0,0
+STU_SAFE_007,Section A,89,82,84,85,84.0,0
+STU_SAFE_008,Section A,91,84,86,88,86.0,0
+STU_SAFE_009,Section B,95,90,92,94,91.0,0
+STU_SAFE_010,Section B,87,79,81,83,82.0,0
+STU_SAFE_011,Section B,93,88,87,90,89.0,0
+STU_SAFE_012,Section B,89,80,82,85,83.0,0
+STU_SAFE_013,Section B,91,83,85,86,85.0,0
+STU_SAFE_014,Section B,97,94,96,95,95.0,0
+STU_SAFE_015,Section B,88,81,83,84,82.0,0

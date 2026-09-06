@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowDown,
@@ -7,16 +7,17 @@ import {
   Check,
   ChevronsUpDown,
   ClipboardCopy,
-  Play,
+  Download,
   Radar,
   ShieldCheck,
+  Upload,
   UserSearch,
   X,
 } from 'lucide-react';
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-import { ENDPOINTS, QUERY_KEYS } from '../api/contract.js';
-import { get, post } from '../api/client.js';
+import { ENDPOINTS } from '../api/contract.js';
+import { post } from '../api/client.js';
 import { cn } from '../lib/cn.js';
 import { num, pct, ratioPct } from '../lib/format.js';
 import { attributeRisk, declineWindow, quizSlope, trajectorySeries } from '../lib/risk.js';
@@ -38,6 +39,50 @@ import {
   TR,
   Table,
 } from '../components/ui/index.js';
+
+/**
+ * Parse CSV student indicators into structured records.
+ *
+ * @param {string} source
+ * @returns {{ok: true, students: Array} | {ok: false, message: string}}
+ */
+function parseCsvStudents(source) {
+  const lines = source.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { ok: false, message: 'The uploaded CSV file is empty.' };
+  }
+
+  let startIdx = 0;
+  if (/student_hash|attendance|section/i.test(lines[0])) {
+    startIdx = 1;
+  }
+
+  const students = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const parts = line.split(',').map((p) => p.trim());
+    if (parts.length >= 7) {
+      students.push({
+        student_hash: parts[0] || `STU_${i}`,
+        section_name: parts[1] || 'Section A',
+        attendance_pct: Number(parts[2]) || 0,
+        quiz1: Number(parts[3]) || 0,
+        quiz2: Number(parts[4]) || 0,
+        quiz3: Number(parts[5]) || 0,
+        midterm_pct: Number(parts[6]) || 0,
+        assignment_delay_count: Number(parts[7]) || 0,
+      });
+    }
+  }
+
+  if (students.length === 0) {
+    return { ok: false, message: 'No valid student rows found in CSV.' };
+  }
+
+  return { ok: true, students };
+}
 
 /* ==========================================================================
  * Constants
@@ -612,32 +657,99 @@ function DetailDrawer({ student, onClose }) {
  * carries the hash and the academic indicators only.
  */
 export default function StudentRadarPage() {
-  const [courseId, setCourseId] = useState(null);
-  const [submittedCourseId, setSubmittedCourseId] = useState(null);
+  const fileInputRef = useRef(null);
   const [sort, setSort] = useState({ column: 'risk_score', direction: 'desc' });
   const [sectionFilter, setSectionFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
   const [selected, setSelected] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [activeCohortTitle, setActiveCohortTitle] = useState(null);
 
   const isWide = useMediaQuery('(min-width: 768px)');
 
-  const coursesQuery = useQuery({
-    queryKey: QUERY_KEYS.courses,
-    queryFn: () => get(ENDPOINTS.courses),
-  });
-  const courses = coursesQuery.data ?? [];
-
-  const auditQuery = useQuery({
-    queryKey: submittedCourseId
-      ? QUERY_KEYS.vulnerableStudents(submittedCourseId)
-      : ['audit', 'vulnerable-students', 'idle'],
-    queryFn: () => post(ENDPOINTS.auditVulnerableStudents, { course_id: submittedCourseId }),
-    enabled: Boolean(submittedCourseId),
-    retry: false,
+  const auditMutation = useMutation({
+    mutationFn: (payload) => post(ENDPOINTS.auditVulnerableStudents, payload),
+    onSuccess: () => {
+      setSelected(null);
+    },
   });
 
-  const report = auditQuery.data;
+  const loadSample = async (sampleType) => {
+    setLoadError(null);
+    setUploading(true);
+    try {
+      const fileName =
+        sampleType === 'high-risk'
+          ? '/samples/students_high_risk_cohort.json'
+          : '/samples/students_safe_balanced_cohort.json';
+      const res = await fetch(fileName);
+      if (!res.ok) throw new Error(`Could not fetch sample: ${fileName}`);
+      const data = await res.json();
+      setActiveCohortTitle(sampleType === 'high-risk' ? 'Sample: High-Risk Cohort' : 'Sample: Safe Healthy Cohort');
+      auditMutation.mutate({
+        students: data,
+      });
+    } catch (err) {
+      setLoadError(err.message ?? 'Could not load sample.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Auto-load high-risk sample cohort on mount
+  useEffect(() => {
+    loadSample('high-risk');
+  }, []);
+
+  const report = auditMutation.data;
+  const isFetching = auditMutation.isPending || uploading;
   const students = report?.students ?? [];
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+
+      let result;
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        result = parseCsvStudents(content);
+      } else {
+        try {
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed)) {
+            result = { ok: true, students: parsed };
+          } else {
+            result = { ok: false, message: 'Expected a JSON array of student records.' };
+          }
+        } catch (err) {
+          result = { ok: false, message: err.message };
+        }
+      }
+
+      if (!result.ok) {
+        setLoadError(`Failed to parse ${file.name}: ${result.message}`);
+        return;
+      }
+
+      setActiveCohortTitle(`Uploaded File: ${file.name}`);
+      auditMutation.mutate({
+        students: result.students,
+      });
+    };
+
+    reader.onerror = () => {
+      setLoadError('Failed to read file from disk.');
+    };
+
+    reader.readAsText(file);
+    event.target.value = '';
+  };
 
   const counts = useMemo(
     () => ({
@@ -688,12 +800,21 @@ export default function StudentRadarPage() {
     <div className="space-y-4">
       <PrivacyNotice />
 
+      {/* Hidden File Input for .csv and .json student data */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".csv,.json"
+        className="hidden"
+      />
+
       {/* --- Top bar ------------------------------------------------------ */}
       <Card>
         <CardHeader
           icon={Radar}
           title="Student radar"
-          subtitle="Academic risk signals across a course's sections. The audit returns flagged records only, so these counts describe the flagged cohort rather than the whole class."
+          subtitle="Academic risk signals across student cohorts. Upload student data or evaluate sample presets to identify attendance breaches, performance collapse, and assignment delays."
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="critical" dot>
@@ -708,42 +829,68 @@ export default function StudentRadarPage() {
             </div>
           }
         />
-        <CardBody>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="min-w-0 flex-1">
-              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                Course
-              </span>
-              <select
-                value={courseId ?? ''}
-                disabled={coursesQuery.isPending}
-                onChange={(event) =>
-                  setCourseId(event.target.value ? Number(event.target.value) : null)
-                }
-                className={cn(selectClass, 'w-full')}
-              >
-                <option value="">Select a course…</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.code} — {course.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <CardBody className="space-y-3">
+          {/* Action Bar: File Upload + 1-Click Cohort Testing */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Upload}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload Student Data (.csv / .json)
+            </Button>
 
             <Button
-              size="md"
-              icon={Play}
-              loading={auditQuery.isFetching}
-              disabled={courseId === null || auditQuery.isFetching}
-              onClick={() => {
-                setSelected(null);
-                setSubmittedCourseId(courseId);
-              }}
+              variant="secondary"
+              size="sm"
+              icon={AlertCircle}
+              loading={uploading}
+              onClick={() => loadSample('high-risk')}
+              className="border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
             >
-              Run Risk Analysis
+              High-Risk Cohort Sample
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Check}
+              loading={uploading}
+              onClick={() => loadSample('safe')}
+              className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+            >
+              Safe Cohort Sample
             </Button>
           </div>
+
+          {/* Template Download Links & Active Badge */}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
+            <span className="font-medium text-slate-300">Templates:</span>
+            <a
+              href="/samples/students_high_risk_cohort.csv"
+              download="students_high_risk_cohort.csv"
+              className="inline-flex items-center gap-1 font-mono text-rose-400/90 underline decoration-rose-400/40 hover:text-rose-300"
+            >
+              <Download className="h-3 w-3" /> High-Risk (.csv)
+            </a>
+            <span className="text-slate-600">·</span>
+            <a
+              href="/samples/students_safe_balanced_cohort.csv"
+              download="students_safe_balanced_cohort.csv"
+              className="inline-flex items-center gap-1 font-mono text-emerald-400/90 underline decoration-emerald-400/40 hover:text-emerald-300"
+            >
+              <Download className="h-3 w-3" /> Safe (.csv)
+            </a>
+            {activeCohortTitle ? (
+              <>
+                <span className="text-slate-600">·</span>
+                <span className="font-semibold text-amber-400">{activeCohortTitle}</span>
+              </>
+            ) : null}
+          </div>
+
+          {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
 
           {students.length ? (
             <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-800 pt-3">
@@ -788,46 +935,42 @@ export default function StudentRadarPage() {
               </p>
             </div>
           ) : null}
-
-          {coursesQuery.isError ? (
-            <p className="mt-2 text-[11px] text-rose-300">
-              Could not load the course list: {coursesQuery.error?.message}
-            </p>
-          ) : null}
         </CardBody>
       </Card>
 
       {/* --- Results ------------------------------------------------------ */}
-      {!submittedCourseId ? (
+      {isFetching ? (
         <Card>
-          <EmptyState
-            icon={UserSearch}
-            title="No analysis run yet"
-            description="Pick a course and run the risk analysis. Results are pseudonymous academic indicators, ranked by risk score."
-          />
+          <CardHeader icon={Radar} title="Scanning cohort" subtitle="Scoring academic indicators…" />
+          <SkeletonTable rows={6} cols={8} />
         </Card>
-      ) : auditQuery.isError ? (
+      ) : auditMutation.isError ? (
         <Card>
           <EmptyState
             tone="critical"
             icon={AlertCircle}
             title="The risk analysis failed"
-            description={auditQuery.error?.message ?? 'The request did not complete.'}
+            description={auditMutation.error?.message ?? 'The request did not complete.'}
             actionLabel="Try again"
-            onAction={() => auditQuery.refetch()}
+            onAction={() => loadSample('high-risk')}
           />
         </Card>
       ) : !report ? (
         <Card>
-          <CardHeader icon={Radar} title="Scanning cohort" subtitle="Scoring academic indicators…" />
-          <SkeletonTable rows={6} cols={8} />
+          <EmptyState
+            icon={UserSearch}
+            title="No cohort loaded yet"
+            description="Upload a student data file (.csv or .json) or load a sample cohort above to evaluate academic risk signals."
+            actionLabel="Load High-Risk Sample"
+            onAction={() => loadSample('high-risk')}
+          />
         </Card>
       ) : !students.length ? (
         <Card>
           <EmptyState
             icon={Check}
             title="No students flagged"
-            description="No record in this course crossed a risk threshold this term."
+            description="No record in this cohort crossed an academic risk threshold."
           />
         </Card>
       ) : !visible.length ? (

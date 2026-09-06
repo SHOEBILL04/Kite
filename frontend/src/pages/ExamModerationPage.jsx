@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   BadgeCheck,
@@ -8,16 +8,20 @@ import {
   ChevronDown,
   Clock,
   Copy,
+  Download,
   Files,
   FileSearch,
   ListTree,
   Play,
   Plus,
+  RefreshCw,
   Scale,
   Sigma,
+  Sparkles,
   Tag,
   Trash2,
   TrendingUp,
+  Upload,
   X,
 } from 'lucide-react';
 import { PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer } from 'recharts';
@@ -175,6 +179,77 @@ function parseQuestionsJson(source) {
       })
     ),
   };
+}
+
+/**
+ * Parse CSV question list into structured questions.
+ * Handles commas, quotes, and header rows cleanly.
+ *
+ * @param {string} source
+ * @returns {{ok: true, questions: Array} | {ok: false, message: string}}
+ */
+function parseCsvQuestions(source) {
+  const lines = source.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    return { ok: false, message: 'The uploaded CSV file is empty.' };
+  }
+
+  let startIdx = 0;
+  if (/q_number|question|bloom/i.test(lines[0])) {
+    startIdx = 1;
+  }
+
+  const rows = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const parts = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === '"') {
+        if (inQuotes && line[c + 1] === '"') {
+          cur += '"';
+          c++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        parts.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    parts.push(cur.trim());
+
+    if (parts.length >= 2) {
+      const qNum = parts[0] || String(rows.length + 1);
+      const qText = parts[1] || '';
+      const marks = Number(parts[2]) || 0;
+      const rawBloom = (parts[3] || '').trim().toUpperCase();
+      const bloom = BLOOM_LEVELS.includes(rawBloom) ? rawBloom : 'C1';
+      const clo = (parts[4] || '').trim() || DEFAULT_CLOS[0];
+
+      rows.push(
+        withKey({
+          q_number: qNum,
+          text: qText,
+          marks,
+          assigned_bloom_level: bloom,
+          assigned_clo: clo,
+        })
+      );
+    }
+  }
+
+  if (rows.length === 0) {
+    return { ok: false, message: 'No valid question rows found in CSV.' };
+  }
+
+  return { ok: true, questions: rows };
 }
 
 /* ==========================================================================
@@ -938,6 +1013,7 @@ function ScorecardSkeleton({ stage }) {
  */
 export default function ExamModerationPage() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef(null);
 
   const [mode, setMode] = useState('structured');
   const [questions, setQuestions] = useState([]);
@@ -945,36 +1021,32 @@ export default function ExamModerationPage() {
   const [exam, setExam] = useState(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [loadError, setLoadError] = useState(null);
-
-  /** The exam the visible report belongs to — only "Run" moves this. */
-  const [submittedExamId, setSubmittedExamId] = useState(null);
+  const [runCount, setRunCount] = useState(0);
 
   const examsQuery = useQuery({ queryKey: QUERY_KEYS.exams, queryFn: () => get(ENDPOINTS.exams) });
 
-  const auditQuery = useQuery({
-    queryKey: submittedExamId
-      ? QUERY_KEYS.examModeration(submittedExamId)
-      : ['audit', 'exam-moderation', 'idle'],
-    queryFn: () => post(ENDPOINTS.auditExamModeration, { exam_id: submittedExamId }),
-    enabled: Boolean(submittedExamId),
-    retry: false,
+  const auditMutation = useMutation({
+    mutationFn: (payload) => post(ENDPOINTS.auditExamModeration, payload),
+    onSuccess: () => {
+      setRunCount((c) => c + 1);
+    },
   });
 
-  const report = auditQuery.data;
+  const report = auditMutation.data;
+  const isAuditing = auditMutation.isPending;
 
   /* --- staged status text while the audit runs ------------------------- */
   const [stage, setStage] = useState(0);
-  const isAuditing = Boolean(submittedExamId) && !report && !auditQuery.isError;
 
   useEffect(() => {
     if (!isAuditing) return undefined;
     setStage(0);
     const timer = setInterval(
       () => setStage((current) => Math.min(current + 1, AUDIT_STAGES.length - 1)),
-      400
+      300
     );
     return () => clearInterval(timer);
-  }, [isAuditing, submittedExamId]);
+  }, [isAuditing]);
 
   /* --- editor plumbing -------------------------------------------------- */
   const jsonValidity = useMemo(() => {
@@ -1015,7 +1087,22 @@ export default function ExamModerationPage() {
       withKey({ ...EMPTY_QUESTION, q_number: String(current.length + 1) }),
     ]);
 
-  const loadDemoExam = async () => {
+  const runAudit = (customQuestions = null, customTotal = null) => {
+    const qList = customQuestions ?? questions;
+    const declaredTotal = customTotal ?? (exam?.total_marks ?? 70);
+
+    if (qList.length > 0) {
+      auditMutation.mutate({
+        questions: qList.map(toDraftQuestion),
+        declared_total: declaredTotal,
+        course_id: exam?.course_id ?? 1,
+      });
+    } else if (exam?.id) {
+      auditMutation.mutate({ exam_id: exam.id });
+    }
+  };
+
+  const loadDemoExam = async (autoRun = false) => {
     setLoadError(null);
     setLoadingDraft(true);
     try {
@@ -1035,12 +1122,110 @@ export default function ExamModerationPage() {
       setExam(draft);
       setQuestions(rows);
       setJsonDraft(serialize(rows));
+
+      if (autoRun) {
+        auditMutation.mutate({ exam_id: draft.id });
+      }
     } catch (failure) {
       setLoadError(failure.message ?? 'Could not load the demo exam.');
     } finally {
       setLoadingDraft(false);
     }
   };
+
+  const loadSample = async (sampleType) => {
+    setLoadError(null);
+    setLoadingDraft(true);
+    try {
+      const fileName =
+        sampleType === 'defective'
+          ? '/samples/sample_exam_defective.json'
+          : '/samples/sample_exam_balanced.json';
+      const res = await fetch(fileName);
+      if (!res.ok) throw new Error(`Could not fetch sample file: ${fileName}`);
+      const data = await res.json();
+      const rows = data.map(withKey);
+      const syntheticExam = {
+        id: null,
+        course_code: 'CSE 2101',
+        course_id: 1,
+        semester: 'Fall 2025',
+        exam_type: sampleType === 'defective' ? 'Draft (Planted Anomalies)' : 'Draft (Balanced)',
+        status: 'draft',
+        total_marks: 70,
+      };
+      setExam(syntheticExam);
+      setQuestions(rows);
+      setJsonDraft(serialize(rows));
+
+      // Trigger deterministic real-time moderation audit immediately
+      auditMutation.mutate({
+        questions: rows.map(toDraftQuestion),
+        declared_total: 70,
+        course_id: 1,
+      });
+    } catch (err) {
+      setLoadError(err.message ?? 'Could not load sample.');
+    } finally {
+      setLoadingDraft(false);
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+
+      const isCsv = file.name.toLowerCase().endsWith('.csv');
+      const result = isCsv ? parseCsvQuestions(content) : parseQuestionsJson(content);
+
+      if (!result.ok) {
+        setLoadError(`Failed to parse ${file.name}: ${result.message}`);
+        return;
+      }
+
+      const rows = result.questions;
+      const syntheticExam = {
+        id: null,
+        course_code: 'CSE 2101',
+        course_id: 1,
+        semester: 'Fall 2025',
+        exam_type: `Uploaded (${file.name})`,
+        status: 'draft',
+        total_marks: 70,
+      };
+      setExam(syntheticExam);
+      setQuestions(rows);
+      setJsonDraft(serialize(rows));
+
+      // Immediately run real-time moderation
+      auditMutation.mutate({
+        questions: rows.map(toDraftQuestion),
+        declared_total: 70,
+        course_id: 1,
+      });
+    };
+
+    reader.onerror = () => {
+      setLoadError('Failed to read file from disk.');
+    };
+
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  // If ?autorun=1 is in the URL, automatically load and audit the seeded draft exam
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autorun') === '1') {
+      loadDemoExam(true);
+    }
+  }, []);
 
   /** CLO options: the declared set plus anything the loaded paper actually uses. */
   const clos = useMemo(() => {
@@ -1057,10 +1242,19 @@ export default function ExamModerationPage() {
     return map;
   }, [report]);
 
-  const canRun = Boolean(exam) && !auditQuery.isFetching && !loadingDraft;
+  const canRun = (Boolean(exam) || questions.length > 0) && !auditMutation.isPending && !loadingDraft;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[45fr_55fr] lg:items-start">
+      {/* Hidden File Input for .json and .csv uploads */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".json,.csv"
+        className="hidden"
+      />
+
       {/* ================= LEFT PANE — editor ============================= */}
       <Card>
         <CardHeader
@@ -1069,7 +1263,7 @@ export default function ExamModerationPage() {
           subtitle={
             exam
               ? `${exam.course_code} · ${exam.semester} ${exam.exam_type}`
-              : 'Load an exam, or draft a paper from scratch.'
+              : 'Upload an exam paper, pick a sample, or draft from scratch.'
           }
           action={
             <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-0.5">
@@ -1094,22 +1288,83 @@ export default function ExamModerationPage() {
         />
 
         <CardBody className="space-y-3">
+          {/* Action Bar: File Upload + 1-Click Samples + Demo */}
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Upload}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload Exam (.json / .csv)
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={AlertTriangle}
+              loading={loadingDraft}
+              onClick={() => loadSample('defective')}
+              className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+            >
+              Defective Sample
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Check}
+              loading={loadingDraft}
+              onClick={() => loadSample('balanced')}
+              className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+            >
+              Balanced Sample
+            </Button>
+
             <Button
               variant="ghost"
               size="sm"
               icon={FileSearch}
               loading={loadingDraft}
-              onClick={loadDemoExam}
+              onClick={() => loadDemoExam(false)}
               disabled={examsQuery.isPending}
             >
-              Load Demo Exam
+              Seeded Exam
             </Button>
+
             {mode === 'structured' ? (
               <Button variant="ghost" size="sm" icon={Plus} onClick={addQuestion}>
                 Add question
               </Button>
             ) : null}
+          </div>
+
+          {/* Sample Download Links */}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
+            <span className="font-medium text-slate-300">Templates:</span>
+            <a
+              href="/samples/sample_exam_defective.csv"
+              download="sample_exam_defective.csv"
+              className="inline-flex items-center gap-1 font-mono text-amber-400/90 underline decoration-amber-400/40 hover:text-amber-300"
+            >
+              <Download className="h-3 w-3" /> Defective (.csv)
+            </a>
+            <span className="text-slate-600">·</span>
+            <a
+              href="/samples/sample_exam_balanced.csv"
+              download="sample_exam_balanced.csv"
+              className="inline-flex items-center gap-1 font-mono text-emerald-400/90 underline decoration-emerald-400/40 hover:text-emerald-300"
+            >
+              <Download className="h-3 w-3" /> Balanced (.csv)
+            </a>
+            <span className="text-slate-600">·</span>
+            <a
+              href="/samples/sample_exam_defective.json"
+              download="sample_exam_defective.json"
+              className="inline-flex items-center gap-1 font-mono text-slate-300 underline hover:text-slate-100"
+            >
+              <Download className="h-3 w-3" /> Defective (.json)
+            </a>
           </div>
 
           {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
@@ -1137,31 +1392,31 @@ export default function ExamModerationPage() {
           ) : (
             <EmptyState
               icon={Braces}
-              title="No questions yet"
-              description="Load the seeded draft exam to see the moderator catch its planted defects, or add questions by hand."
-              actionLabel="Load Demo Exam"
-              onAction={loadDemoExam}
+              title="No questions loaded yet"
+              description="Upload a CSV/JSON exam paper, load a ready sample to test planted defects, or add questions manually."
+              actionLabel="Load Defective Sample"
+              onAction={() => loadSample('defective')}
             />
           )}
         </CardBody>
 
         <div className="space-y-3 border-t border-slate-800 p-4">
-          <MarkTotalFooter questions={questions} declaredTotal={exam?.total_marks} />
+          <MarkTotalFooter questions={questions} declaredTotal={exam?.total_marks ?? 70} />
 
           <Button
             size="lg"
             icon={Play}
             className="w-full"
-            loading={auditQuery.isFetching}
+            loading={auditMutation.isPending}
             disabled={!canRun}
-            onClick={() => setSubmittedExamId(exam.id)}
+            onClick={() => runAudit()}
           >
             Run Moderation Audit
           </Button>
 
-          {!exam ? (
+          {!exam && questions.length === 0 ? (
             <p className="text-center text-[11px] text-slate-500">
-              The audit runs against a stored exam, so load one before running it.
+              Upload a paper or load a sample to run real-time moderation.
             </p>
           ) : null}
         </div>
@@ -1169,26 +1424,26 @@ export default function ExamModerationPage() {
 
       {/* ================= RIGHT PANE — scorecard ========================= */}
       <div className="space-y-4">
-        {!submittedExamId ? (
+        {!report && !auditMutation.isPending && !auditMutation.isError ? (
           <Card>
             <EmptyState
               icon={BadgeCheck}
               title="No moderation run yet"
-              description="The editor on the left already reconciles the mark total. Run the audit to add Bloom verification, duplicate detection and mark-feasibility checks."
+              description="Upload an exam paper (.json/.csv) or click one of the sample buttons on the left to see real-time Bloom verification, past-paper duplicate alerts, and mark feasibility."
             />
           </Card>
-        ) : auditQuery.isError ? (
+        ) : auditMutation.isError ? (
           <Card>
             <EmptyState
               tone="critical"
               icon={AlertTriangle}
               title="The moderation audit failed"
-              description={auditQuery.error?.message ?? 'The request did not complete.'}
+              description={auditMutation.error?.message ?? 'The request did not complete.'}
               actionLabel="Try again"
-              onAction={() => auditQuery.refetch()}
+              onAction={() => runAudit()}
             />
           </Card>
-        ) : !report ? (
+        ) : auditMutation.isPending ? (
           <ScorecardSkeleton stage={AUDIT_STAGES[stage]} />
         ) : (
           <>
@@ -1202,7 +1457,7 @@ export default function ExamModerationPage() {
               />
             </div>
 
-            <LintReport key={submittedExamId} questions={report.questions} />
+            <LintReport key={`run-${runCount}`} questions={report.questions} />
             <DuplicationAlerts duplicates={report.duplicates} questions={report.questions} />
             <AiSummaryCard
               summary={report.ai_summary}

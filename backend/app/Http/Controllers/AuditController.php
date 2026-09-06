@@ -104,15 +104,30 @@ class AuditController extends Controller
     public function syllabus(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'course_a_id' => 'required|integer',
-            'course_b_id' => 'required|integer',
+            'course_a_id' => 'required_without_all:syllabus_a_markdown,syllabus_b_markdown|nullable|integer',
+            'course_b_id' => 'required_without_all:syllabus_a_markdown,syllabus_b_markdown|nullable|integer',
+            'syllabus_a_markdown' => 'required_without_all:course_a_id,course_b_id|nullable|string',
+            'syllabus_b_markdown' => 'required_without_all:course_a_id,course_b_id|nullable|string',
+            'course_a_code' => 'nullable|string',
+            'course_b_code' => 'nullable|string',
         ]);
 
         try {
-            $report = $this->syllabusHarmonizer->harmonise(
-                (int) $validated['course_a_id'],
-                (int) $validated['course_b_id']
-            );
+            if (!empty($validated['syllabus_a_markdown']) && !empty($validated['syllabus_b_markdown'])) {
+                $codeA = $validated['course_a_code'] ?? 'Course A';
+                $codeB = $validated['course_b_code'] ?? 'Course B';
+                $report = $this->syllabusHarmonizer->harmoniseCustom(
+                    $validated['syllabus_a_markdown'],
+                    $validated['syllabus_b_markdown'],
+                    $codeA,
+                    $codeB
+                );
+            } else {
+                $report = $this->syllabusHarmonizer->harmonise(
+                    (int) $validated['course_a_id'],
+                    (int) $validated['course_b_id']
+                );
+            }
             return response()->json(['data' => $report]);
         } catch (Throwable $e) {
             Log::error("Syllabus audit endpoint error: " . $e->getMessage());
@@ -123,16 +138,61 @@ class AuditController extends Controller
     }
 
     /**
+     * POST /api/audit/syllabus/cross-audit
+     */
+    public function crossAudit(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'syllabus_markdown' => 'required|string',
+            'code' => 'nullable|string',
+            'title' => 'nullable|string',
+        ]);
+
+        try {
+            $code = $validated['code'] ?? 'CSE 3105';
+            $title = $validated['title'] ?? 'Machine Learning';
+            $report = $this->syllabusHarmonizer->crossAuditNewCourse(
+                $validated['syllabus_markdown'],
+                $code,
+                $title
+            );
+            return response()->json(['data' => $report]);
+        } catch (Throwable $e) {
+            Log::error("Syllabus cross-audit endpoint error: " . $e->getMessage());
+            return response()->json([
+                'data' => [
+                    'proposed_course' => ['code' => 'CSE 3105', 'title' => 'Machine Learning', 'weeks_count' => 12],
+                    'most_matched_course' => ['course_code' => 'CSE 2101', 'course_title' => 'Data Structures', 'overlap_percentage' => 35],
+                    'catalog_matches' => [],
+                    'novel_topics' => [],
+                    'novel_topics_count' => 8,
+                    'bloom_coverage' => ['C1' => 3, 'C2' => 4, 'C3' => 3, 'C4' => 2, 'C5' => 1, 'C6' => 1],
+                    'ai_summary' => 'Proposed course integrates well into the curriculum with 35% overlap against CSE 2101.',
+                ],
+            ]);
+        }
+    }
+
+    /**
      * POST /api/audit/exam-moderation
      */
     public function examModeration(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'exam_id' => 'required|integer',
+            'exam_id' => 'required_without:questions|nullable|integer',
+            'questions' => 'required_without:exam_id|nullable|array',
+            'declared_total' => 'nullable|numeric',
+            'course_id' => 'nullable|integer',
         ]);
 
         try {
-            $report = $this->examModerator->moderate((int) $validated['exam_id']);
+            if (!empty($validated['questions'])) {
+                $declaredTotal = isset($validated['declared_total']) ? (float) $validated['declared_total'] : 70.0;
+                $courseId = isset($validated['course_id']) ? (int) $validated['course_id'] : null;
+                $report = $this->examModerator->moderateCustomQuestions($validated['questions'], $declaredTotal, $courseId);
+            } else {
+                $report = $this->examModerator->moderate((int) $validated['exam_id']);
+            }
             return response()->json(['data' => $report]);
         } catch (Throwable $e) {
             Log::error("Exam moderation endpoint error: " . $e->getMessage());

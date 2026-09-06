@@ -1,0 +1,152 @@
+[
+  {
+    "student_hash": "STU_SAFE_001",
+    "section_name": "Section A",
+    "attendance_pct": 94,
+    "quiz1": 88,
+    "quiz2": 90,
+    "quiz3": 92,
+    "midterm_pct": 88.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_002",
+    "section_name": "Section A",
+    "attendance_pct": 90,
+    "quiz1": 82,
+    "quiz2": 85,
+    "quiz3": 84,
+    "midterm_pct": 85.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_003",
+    "section_name": "Section A",
+    "attendance_pct": 88,
+    "quiz1": 78,
+    "quiz2": 80,
+    "quiz3": 82,
+    "midterm_pct": 80.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_004",
+    "section_name": "Section A",
+    "attendance_pct": 92,
+    "quiz1": 85,
+    "quiz2": 84,
+    "quiz3": 86,
+    "midterm_pct": 87.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_005",
+    "section_name": "Section A",
+    "attendance_pct": 96,
+    "quiz1": 92,
+    "quiz2": 94,
+    "quiz3": 95,
+    "midterm_pct": 92.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_006",
+    "section_name": "Section A",
+    "attendance_pct": 86,
+    "quiz1": 76,
+    "quiz2": 80,
+    "quiz3": 82,
+    "midterm_pct": 81.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_007",
+    "section_name": "Section A",
+    "attendance_pct": 89,
+    "quiz1": 82,
+    "quiz2": 84,
+    "quiz3": 85,
+    "midterm_pct": 84.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_008",
+    "section_name": "Section A",
+    "attendance_pct": 91,
+    "quiz1": 84,
+    "quiz2": 86,
+    "quiz3": 88,
+    "midterm_pct": 86.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_009",
+    "section_name": "Section B",
+    "attendance_pct": 95,
+    "quiz1": 90,
+    "quiz2": 92,
+    "quiz3": 94,
+    "midterm_pct": 91.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_010",
+    "section_name": "Section B",
+    "attendance_pct": 87,
+    "quiz1": 79,
+    "quiz2": 81,
+    "quiz3": 83,
+    "midterm_pct": 82.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_011",
+    "section_name": "Section B",
+    "attendance_pct": 93,
+    "quiz1": 88,
+    "quiz2": 87,
+    "quiz3": 90,
+    "midterm_pct": 89.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_012",
+    "section_name": "Section B",
+    "attendance_pct": 89,
+    "quiz1": 80,
+    "quiz2": 82,
+    "quiz3": 85,
+    "midterm_pct": 83.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_013",
+    "section_name": "Section B",
+    "attendance_pct": 91,
+    "quiz1": 83,
+    "quiz2": 85,
+    "quiz3": 86,
+    "midterm_pct": 85.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_014",
+    "section_name": "Section B",
+    "attendance_pct": 97,
+    "quiz1": 94,
+    "quiz2": 96,
+    "quiz3": 95,
+    "midterm_pct": 95.0,
+    "assignment_delay_count": 0
+  },
+  {
+    "student_hash": "STU_SAFE_015",
+    "section_name": "Section B",
+    "attendance_pct": 88,
+    "quiz1": 81,
+    "quiz2": 83,
+    "quiz3": 84,
+    "midterm_pct": 82.0,
+    "assignment_delay_count": 0
+  }
+]

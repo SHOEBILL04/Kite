@@ -1,17 +1,19 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeftRight,
   Check,
   ChevronDown,
   Copy,
+  Download,
   GitCompare,
   Layers,
   ListChecks,
   Play,
   RotateCw,
   ScanSearch,
+  Upload,
 } from 'lucide-react';
 import {
   Bar,
@@ -114,40 +116,6 @@ const TABS = [
   { id: 'missing', label: 'Missing Prerequisites' },
   { id: 'bloom', label: 'Bloom Coverage' },
 ];
-
-/* ==========================================================================
- * Top bar
- * ======================================================================= */
-
-function CourseSelect({ id, label, value, onChange, courses, disabled }) {
-  return (
-    <div className="min-w-0 flex-1">
-      <label
-        htmlFor={id}
-        className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500"
-      >
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value ?? ''}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}
-        className={cn(
-          'focus-ring h-8 w-full rounded-lg border border-slate-800 bg-slate-900 px-2 text-[13px] text-slate-200',
-          'transition-colors hover:border-slate-700 disabled:cursor-not-allowed disabled:text-slate-600'
-        )}
-      >
-        <option value="">Select a course…</option>
-        {courses.map((course) => (
-          <option key={course.id} value={course.id}>
-            {course.code} — {course.title}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 /* ==========================================================================
  * 1. Alignment score
@@ -844,177 +812,734 @@ function LoadingResults() {
 }
 
 /* ==========================================================================
- * Page
+ * Propose New Course Catalog Cross-Audit View
+ * ======================================================================= */
+
+function NewCourseCrossAuditView() {
+  const fileInputRef = useRef(null);
+  const [code, setCode] = useState('CSE 3105');
+  const [title, setTitle] = useState('Machine Learning & Data Analytics');
+  const [syllabusMarkdown, setSyllabusMarkdown] = useState(`# CSE 3105: Machine Learning & Data Analytics
+
+- **Week 1:** Introduction to machine learning paradigms, supervised vs unsupervised learning, and asymptotic complexity review.
+- **Week 2:** Linear Regression: Gradient descent optimization, loss functions, and matrix formulations.
+- **Week 3:** Logistic Regression: Sigmoid activation, cross-entropy loss, binary classification, and decision boundaries.
+- **Week 4:** Decision Trees: Information gain, Entropy, Gini impurity, tree pruning, and recursive decision nodes.
+- **Week 5:** Support Vector Machines (SVM): Hyperplanes, margin maximization, kernel trick, and convex optimization.
+- **Week 6:** Clustering: K-Means clustering algorithm, hierarchical clustering, centroid updates, and distance metrics.
+- **Week 7:** Principal Component Analysis (PCA): Dimensionality reduction, variance maximization, eigenvectors, and eigenvalues.
+- **Week 8:** Neural Networks I: Perceptrons, multi-layer feedforward networks, backpropagation, and chain rule derivatives.
+- **Week 9:** Neural Networks II: Convolutional Neural Networks (CNNs), pooling layers, feature maps, and image classification.
+- **Week 10:** Natural Language Processing: Tokenization, Word Embeddings (Word2Vec), Recurrent Neural Networks (RNNs), and Attention.
+- **Week 11:** Model Evaluation & Hyperparameter Tuning: Cross-validation, Bias-Variance tradeoff, Precision, Recall, F1-Score, and ROC-AUC.
+- **Week 12:** Ethics & Governance in AI: Algorithmic bias, fairness metrics, model explainability (SHAP/LIME), and deployment pipelines.`);
+  const [loadError, setLoadError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const crossAuditMutation = useMutation({
+    mutationFn: (payload) => post(ENDPOINTS.auditSyllabusCrossAudit, payload),
+  });
+
+  const report = crossAuditMutation.data;
+  const isFetching = crossAuditMutation.isPending || uploading;
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+      setSyllabusMarkdown(content);
+      const inferredCode = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+      setCode(inferredCode);
+      crossAuditMutation.mutate({
+        syllabus_markdown: content,
+        code: inferredCode,
+        title,
+      });
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const loadSampleProposed = async () => {
+    setLoadError(null);
+    setUploading(true);
+    try {
+      const res = await fetch('/samples/curriculum_proposed_cse3105_machine_learning.md');
+      if (!res.ok) throw new Error('Could not fetch proposed course sample.');
+      const text = await res.text();
+      setSyllabusMarkdown(text);
+      setCode('CSE 3105');
+      setTitle('Machine Learning & Data Analytics');
+      crossAuditMutation.mutate({
+        syllabus_markdown: text,
+        code: 'CSE 3105',
+        title: 'Machine Learning & Data Analytics',
+      });
+    } catch (err) {
+      setLoadError(err.message ?? 'Failed to load proposed course sample.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const runCrossAudit = () => {
+    if (!syllabusMarkdown.trim()) return;
+    crossAuditMutation.mutate({
+      syllabus_markdown: syllabusMarkdown,
+      code,
+      title,
+    });
+  };
+
+  const bloomCounts = report?.bloom_coverage ?? { C1: 0, C2: 0, C3: 0, C4: 0, C5: 0, C6: 0 };
+  const chartData = BLOOM_LEVELS.map((level) => ({
+    level,
+    count: bloomCounts[level] ?? 0,
+  }));
+
+  return (
+    <div className="space-y-4">
+      <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".md,.txt" className="hidden" />
+
+      {/* --- Top Proposal & Input Card --- */}
+      <Card>
+        <CardHeader
+          icon={Layers}
+          title="Propose new course & cross-audit catalog"
+          subtitle="Define a proposed course curriculum following the week-by-week schema. The engine automatically audits it against all existing courses in the catalog, identifies the most matched course, isolates novel material, and evaluates prerequisite alignment."
+        />
+        <CardBody className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400 mb-1">
+                Proposed Course Code
+              </label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="e.g. CSE 3105"
+                className="w-full h-9 rounded-lg border border-slate-800 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400 mb-1">
+                Proposed Course Title
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Machine Learning & Data Analytics"
+                className="w-full h-9 rounded-lg border border-slate-800 bg-slate-900 px-3 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Syllabus Markdown Schema (Week-by-Week Topics)
+              </label>
+              <a
+                href="/samples/curriculum_proposed_cse3105_machine_learning.md"
+                download="proposed_course_schema_template.md"
+                className="inline-flex items-center gap-1 font-mono text-[11px] text-cyan-400/90 underline hover:text-cyan-300"
+              >
+                <Download className="h-3 w-3" /> Download Schema Template
+              </a>
+            </div>
+            <textarea
+              rows={8}
+              value={syllabusMarkdown}
+              onChange={(e) => setSyllabusMarkdown(e.target.value)}
+              className="w-full rounded-lg border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Upload}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Upload Proposed Syllabus (.md / .txt)
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Layers}
+                loading={uploading}
+                onClick={loadSampleProposed}
+                className="border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
+              >
+                Load Sample Proposed Course (CSE 3105 ML)
+              </Button>
+            </div>
+
+            <Button
+              variant="primary"
+              size="md"
+              icon={Play}
+              loading={isFetching}
+              disabled={!syllabusMarkdown.trim() || isFetching}
+              onClick={runCrossAudit}
+            >
+              Run Catalog Cross-Audit & Report
+            </Button>
+          </div>
+
+          {loadError ? <p className="text-[11px] text-rose-300">{loadError}</p> : null}
+        </CardBody>
+      </Card>
+
+      {/* --- Cross Audit Results Section --- */}
+      {isFetching && !report ? (
+        <LoadingResults />
+      ) : crossAuditMutation.isError ? (
+        <Card>
+          <EmptyState
+            tone="critical"
+            icon={AlertTriangle}
+            title="Catalog cross-audit failed"
+            description={crossAuditMutation.error?.message ?? 'The request did not complete.'}
+            actionLabel="Try again"
+            onAction={runCrossAudit}
+          />
+        </Card>
+      ) : !report ? (
+        <Card>
+          <EmptyState
+            icon={ScanSearch}
+            title="No cross-audit report generated yet"
+            description="Input or upload a proposed course curriculum above and click 'Run Catalog Cross-Audit & Report' to evaluate overlap against all existing department courses."
+            actionLabel="Load Sample Proposed Course (CSE 3105 ML)"
+            onAction={loadSampleProposed}
+          />
+        </Card>
+      ) : (
+        <>
+          {/* Hero Card: Most Matched Course */}
+          {report.most_matched_course ? (
+            <Card className="border-l-4 border-l-amber-400 bg-slate-900/90">
+              <CardBody className="p-4 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase tracking-wide font-semibold text-slate-400">
+                      Most Matched Existing Course in Catalog
+                    </span>
+                    <Badge variant="warning" dot>
+                      {report.most_matched_course.overlap_percentage}% Overlap Match
+                    </Badge>
+                  </div>
+                  <span className="text-xs font-mono text-slate-500">
+                    {report.most_matched_course.redundant_topics_count} Overlapping Weeks
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-100">
+                  {report.most_matched_course.course_code} — {report.most_matched_course.course_title}
+                </h3>
+                <p className="text-xs leading-relaxed text-slate-300">
+                  This course in the current curriculum carries the highest topic overlap with the proposed{' '}
+                  <span className="font-semibold text-cyan-300">{report.proposed_course?.code}</span> syllabus.
+                </p>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {/* Novel & Unique Topics Introduced */}
+          <Card>
+            <CardHeader
+              icon={Check}
+              title="Novel & Unique Topics Introduced"
+              subtitle={`Isolates ${report.novel_topics_count ?? 0} topic weeks introduced by this proposed course that do not duplicate any existing material in the current catalog.`}
+            />
+            <CardBody>
+              {report.novel_topics?.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {report.novel_topics.map((item) => (
+                    <div
+                      key={item.week}
+                      className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-xs"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-emerald-400">{item.label}</span>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wide font-mono">
+                          Unique Concept
+                        </span>
+                      </div>
+                      <p className="text-slate-300 leading-snug">{item.topic}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">All topics in this proposal overlap with existing courses.</p>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* Catalog-Wide Comparison Breakdown */}
+          <Card>
+            <CardHeader
+              icon={GitCompare}
+              title="Catalog-wide Course Comparison Matrix"
+              subtitle="Comparison breakdown against every active course in the department catalog."
+            />
+            <Table>
+              <THead>
+                <TR>
+                  <TH align="left">Course</TH>
+                  <TH align="right">Overlap Match %</TH>
+                  <TH align="right">Redundant Weeks</TH>
+                  <TH align="right">Prerequisite Gaps</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {(report.catalog_matches ?? []).map((item) => (
+                  <TR key={item.course_code}>
+                    <TD className="font-medium text-slate-100">
+                      {item.course_code} — {item.course_title}
+                    </TD>
+                    <TD align="right">
+                      <span
+                        className={cn(
+                          'tabular-nums font-semibold',
+                          item.overlap_percentage > 40 ? 'text-amber-400' : 'text-slate-300'
+                        )}
+                      >
+                        {item.overlap_percentage}%
+                      </span>
+                    </TD>
+                    <TD align="right" className="tabular-nums text-slate-300">
+                      {item.redundant_topics_count}
+                    </TD>
+                    <TD align="right" className="tabular-nums text-slate-400">
+                      {item.missing_prerequisites_count}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </Card>
+
+          {/* Groq Llama 3.3 Executive Report */}
+          <AiSummaryCard
+            summary={report.ai_summary}
+            meta={`Proposal Audit: ${report.proposed_course?.code} ${report.proposed_course?.title}`}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ==========================================================================
+ * Main Page Component with Mode Switcher
  * ======================================================================= */
 
 /**
  * OWNER: curriculum dev.
  *
- * POST /audit/syllabus { course_a_id, course_b_id } -> SyllabusReport.
- *
- * The signature visual is the dual-column diff: each course's
- * `syllabus_markdown` is parsed into addressable topic rows (see
- * `src/lib/syllabus.js`) and the report's findings are painted back onto the
- * lines they came from, so a redundancy can be seen in both syllabi at once.
+ * Supports Course Pair Harmonization and Propose New Course Catalog Cross-Audit.
  */
 export default function CurriculumHarmonizerPage() {
-  const [pair, setPair] = useState({ a: null, b: null });
-  /** The pair the visible report belongs to — only "Run" moves this. */
-  const [submitted, setSubmitted] = useState(null);
+  const [mode, setMode] = useState('pair'); // 'pair' | 'propose'
 
-  const coursesQuery = useQuery({
-    queryKey: QUERY_KEYS.courses,
-    queryFn: () => get(ENDPOINTS.courses),
+  const fileInputARef = useRef(null);
+  const fileInputBRef = useRef(null);
+
+  const [customCourseA, setCustomCourseA] = useState(null);
+  const [customCourseB, setCustomCourseB] = useState(null);
+  const [activeCohortTitle, setActiveCohortTitle] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const auditMutation = useMutation({
+    mutationFn: (payload) => post(ENDPOINTS.auditSyllabus, payload),
   });
 
-  const courses = coursesQuery.data ?? [];
+  const submittedA = customCourseA;
+  const submittedB = customCourseB;
 
-  const auditQuery = useQuery({
-    queryKey: submitted ? QUERY_KEYS.syllabus(submitted.a, submitted.b) : ['audit', 'syllabus', 'idle'],
-    queryFn: () =>
-      post(ENDPOINTS.auditSyllabus, { course_a_id: submitted.a, course_b_id: submitted.b }),
-    enabled: Boolean(submitted),
-    retry: false,
-  });
+  const report = auditMutation.data;
+  const isFetching = auditMutation.isPending || uploading;
 
-  const byId = (id) => courses.find((course) => course.id === id) ?? null;
-  const submittedA = submitted ? byId(submitted.a) : null;
-  const submittedB = submitted ? byId(submitted.b) : null;
+  const isSameFile = useMemo(() => {
+    if (!customCourseA?.syllabus_markdown || !customCourseB?.syllabus_markdown) return false;
+    return customCourseA.syllabus_markdown.trim() === customCourseB.syllabus_markdown.trim();
+  }, [customCourseA, customCourseB]);
 
-  const samePair = pair.a !== null && pair.a === pair.b;
-  const canRun = pair.a !== null && pair.b !== null && !samePair && !auditQuery.isFetching;
+  const canRun = Boolean(customCourseA?.syllabus_markdown && customCourseB?.syllabus_markdown) && !isSameFile && !isFetching;
 
-  const loadDemoPair = () => {
-    const a = courses.find((course) => course.code === DEMO_PAIR.a) ?? courses[0];
-    const b = courses.find((course) => course.code === DEMO_PAIR.b) ?? courses[1];
-    setPair({ a: a?.id ?? null, b: b?.id ?? null });
+  const loadSamplePair = async () => {
+    setLoadError(null);
+    setUploading(true);
+    try {
+      const [resA, resB] = await Promise.all([
+        fetch('/samples/curriculum_cse2101_data_structures.md'),
+        fetch('/samples/curriculum_cse2103_algorithms.md'),
+      ]);
+      if (!resA.ok || !resB.ok) throw new Error('Could not fetch sample curricula.');
+      const [textA, textB] = await Promise.all([resA.text(), resB.text()]);
+
+      const cA = { code: 'CSE 2101', title: 'Data Structures (Sample)', syllabus_markdown: textA };
+      const cB = { code: 'CSE 2103', title: 'Algorithms (Sample)', syllabus_markdown: textB };
+      setCustomCourseA(cA);
+      setCustomCourseB(cB);
+      setActiveCohortTitle('Sample Pair: CSE 2101 → CSE 2103');
+
+      auditMutation.mutate({
+        syllabus_a_markdown: textA,
+        syllabus_b_markdown: textB,
+        course_a_code: 'CSE 2101',
+        course_b_code: 'CSE 2103',
+      });
+    } catch (err) {
+      setLoadError(err.message ?? 'Failed to load sample curricula.');
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const swap = () => setPair((current) => ({ a: current.b, b: current.a }));
+  useEffect(() => {
+    loadSamplePair();
+  }, []);
 
-  const report = auditQuery.data;
+  const handleFileUploadA = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+
+      if (customCourseB?.syllabus_markdown && content.trim() === customCourseB.syllabus_markdown.trim()) {
+        setLoadError('Validation Error: The same file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different curriculum files.');
+        return;
+      }
+
+      const code = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+      const newA = { code, title: file.name, syllabus_markdown: content };
+      setCustomCourseA(newA);
+      setActiveCohortTitle(`Uploaded Course A: ${file.name}`);
+
+      if (customCourseB?.syllabus_markdown) {
+        auditMutation.mutate({
+          syllabus_a_markdown: content,
+          syllabus_b_markdown: customCourseB.syllabus_markdown,
+          course_a_code: code,
+          course_b_code: customCourseB.code,
+        });
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const handleFileUploadB = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result;
+      if (typeof content !== 'string') return;
+
+      if (customCourseA?.syllabus_markdown && content.trim() === customCourseA.syllabus_markdown.trim()) {
+        setLoadError('Validation Error: The same file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different curriculum files.');
+        return;
+      }
+
+      const code = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+      const newB = { code, title: file.name, syllabus_markdown: content };
+      setCustomCourseB(newB);
+      setActiveCohortTitle(`Uploaded Course B: ${file.name}`);
+
+      if (customCourseA?.syllabus_markdown) {
+        auditMutation.mutate({
+          syllabus_a_markdown: customCourseA.syllabus_markdown,
+          syllabus_b_markdown: content,
+          course_a_code: customCourseA.code,
+          course_b_code: code,
+        });
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const swap = () => {
+    const tempA = customCourseA;
+    const tempB = customCourseB;
+    setCustomCourseA(tempB);
+    setCustomCourseB(tempA);
+    if (tempA && tempB && tempA.syllabus_markdown.trim() !== tempB.syllabus_markdown.trim()) {
+      auditMutation.mutate({
+        syllabus_a_markdown: tempB.syllabus_markdown,
+        syllabus_b_markdown: tempA.syllabus_markdown,
+        course_a_code: tempB.code,
+        course_b_code: tempA.code,
+      });
+    }
+  };
 
   return (
     <div className="space-y-4">
-      {/* --- Top bar ------------------------------------------------------ */}
-      <Card>
-        <CardHeader
-          icon={GitCompare}
-          title="Course pair"
-          subtitle="Audit a prerequisite course against the course that builds on it."
-          action={
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={Layers}
-              onClick={loadDemoPair}
-              disabled={coursesQuery.isPending || courses.length < 2}
-            >
-              Load Demo Pair
-            </Button>
-          }
-        />
-        <CardBody>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            <CourseSelect
-              id="course-a"
-              label="Prerequisite Course"
-              value={pair.a}
-              onChange={(id) => setPair((current) => ({ ...current, a: id }))}
-              courses={courses}
-              disabled={coursesQuery.isPending}
-            />
+      {/* Mode Switcher Navigation Header */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+        <button
+          type="button"
+          onClick={() => setMode('pair')}
+          className={cn(
+            'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
+            mode === 'pair'
+              ? 'bg-amber-400/10 text-amber-300 border border-amber-400/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          )}
+        >
+          <GitCompare className="h-3.5 w-3.5" /> Course Pair Harmonization
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('propose')}
+          className={cn(
+            'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
+            mode === 'propose'
+              ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          )}
+        >
+          <Layers className="h-3.5 w-3.5" /> Propose New Course (Catalog Cross-Audit)
+        </button>
+      </div>
 
-            <Button
-              variant="ghost"
-              size="md"
-              icon={ArrowLeftRight}
-              onClick={swap}
-              disabled={pair.a === null && pair.b === null}
-              aria-label="Swap the prerequisite and target courses"
-              className="shrink-0 self-start lg:self-auto"
-            />
-
-            <CourseSelect
-              id="course-b"
-              label="Target Course"
-              value={pair.b}
-              onChange={(id) => setPair((current) => ({ ...current, b: id }))}
-              courses={courses}
-              disabled={coursesQuery.isPending}
-            />
-
-            <Button
-              size="md"
-              icon={Play}
-              loading={auditQuery.isFetching}
-              disabled={!canRun}
-              onClick={() => setSubmitted({ a: pair.a, b: pair.b })}
-              className="shrink-0"
-            >
-              Run Harmonization Audit
-            </Button>
-          </div>
-
-          {samePair ? (
-            <p className="mt-2 text-[11px] text-amber-300">
-              Pick two different courses — a syllabus cannot be harmonized against itself.
-            </p>
-          ) : null}
-          {coursesQuery.isError ? (
-            <p className="mt-2 text-[11px] text-rose-300">
-              Could not load the course list: {coursesQuery.error?.message}
-            </p>
-          ) : null}
-        </CardBody>
-      </Card>
-
-      {/* --- Results ------------------------------------------------------ */}
-      {!submitted ? (
-        <Card>
-          <EmptyState
-            icon={ScanSearch}
-            title="No audit run yet"
-            description="Choose a prerequisite course and the course that builds on it, then run the audit. Load Demo Pair prefills CSE 2101 → CSE 2103."
-            actionLabel={courses.length >= 2 ? 'Load Demo Pair' : undefined}
-            onAction={courses.length >= 2 ? loadDemoPair : undefined}
-          />
-        </Card>
-      ) : auditQuery.isError ? (
-        <Card>
-          <EmptyState
-            tone="critical"
-            icon={AlertTriangle}
-            title="The harmonization audit failed"
-            description={auditQuery.error?.message ?? 'The request did not complete.'}
-            actionLabel="Try again"
-            onAction={() => auditQuery.refetch()}
-          />
-        </Card>
-      ) : !report ? (
-        <LoadingResults />
+      {mode === 'propose' ? (
+        <NewCourseCrossAuditView />
       ) : (
         <>
-          <AlignmentHeader report={report} courseA={submittedA} courseB={submittedB} />
-          <SyllabusDiff report={report} courseA={submittedA} courseB={submittedB} />
-          <FindingsTabs report={report} courseA={submittedA} courseB={submittedB} />
-          <ActionableChanges changes={report.actionable_changes} />
-          <AiSummaryCard
-            summary={report.ai_summary}
-            meta={
-              submittedA && submittedB ? `${submittedA.code} → ${submittedB.code}` : undefined
-            }
-          />
+          {/* Hidden file inputs */}
+          <input type="file" ref={fileInputARef} onChange={handleFileUploadA} accept=".md,.txt" className="hidden" />
+          <input type="file" ref={fileInputBRef} onChange={handleFileUploadB} accept=".md,.txt" className="hidden" />
+
+          {/* --- Top bar ------------------------------------------------------ */}
+          <Card>
+            <CardHeader
+              icon={GitCompare}
+              title="Curriculum Harmonizer"
+              subtitle="Upload two curriculum markdown files (.md / .txt) to audit prerequisite alignment, re-taught topics, and Bloom taxonomy coverage."
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={GitCompare}
+                  loading={uploading}
+                  onClick={loadSamplePair}
+                  className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                >
+                  Load Overlapping Curriculums Sample
+                </Button>
+              }
+            />
+            <CardBody className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                {/* Curriculum A Upload Button */}
+                <div className="lg:col-span-2 space-y-1">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Prerequisite Curriculum (A)
+                  </label>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    icon={Upload}
+                    onClick={() => fileInputARef.current?.click()}
+                    className="w-full justify-start overflow-hidden text-ellipsis whitespace-nowrap"
+                  >
+                    {customCourseA ? `Curriculum A: ${customCourseA.code}` : 'Upload Curriculum A (.md / .txt)'}
+                  </Button>
+                </div>
+
+                {/* Swap Button */}
+                <div className="flex items-center justify-center pb-0.5">
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    icon={ArrowLeftRight}
+                    onClick={swap}
+                    disabled={!customCourseA || !customCourseB}
+                    aria-label="Swap prerequisite and target curricula"
+                    title="Swap Curricula"
+                    className="shrink-0"
+                  />
+                </div>
+
+                {/* Curriculum B Upload Button */}
+                <div className="lg:col-span-2 space-y-1">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Target Curriculum (B)
+                  </label>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    icon={Upload}
+                    onClick={() => fileInputBRef.current?.click()}
+                    className="w-full justify-start overflow-hidden text-ellipsis whitespace-nowrap"
+                  >
+                    {customCourseB ? `Curriculum B: ${customCourseB.code}` : 'Upload Curriculum B (.md / .txt)'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Action buttons & templates bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-1.5 text-[11px] text-slate-400">
+                  <span className="font-medium text-slate-300">Templates:</span>
+                  <a
+                    href="/samples/curriculum_cse2101_data_structures.md"
+                    download="curriculum_cse2101_data_structures.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> Data Structures (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse2103_algorithms.md"
+                    download="curriculum_cse2103_algorithms.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> Algorithms (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse3101_database_systems.md"
+                    download="curriculum_cse3101_database_systems.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> DBMS (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse3103_operating_systems.md"
+                    download="curriculum_cse3103_operating_systems.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> OS (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse4101_computer_networks.md"
+                    download="curriculum_cse4101_computer_networks.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> Networks (.md)
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <a
+                    href="/samples/curriculum_cse4103_artificial_intelligence.md"
+                    download="curriculum_cse4103_artificial_intelligence.md"
+                    className="inline-flex items-center gap-1 font-mono text-cyan-400/90 underline decoration-cyan-400/40 hover:text-cyan-300"
+                  >
+                    <Download className="h-3 w-3" /> AI (.md)
+                  </a>
+                  {activeCohortTitle ? (
+                    <>
+                      <span className="text-slate-600">·</span>
+                      <span className="font-semibold text-amber-400">{activeCohortTitle}</span>
+                    </>
+                  ) : null}
+                </div>
+
+                <Button
+                  size="md"
+                  icon={Play}
+                  loading={isFetching}
+                  disabled={!canRun}
+                  onClick={() => {
+                    if (customCourseA && customCourseB) {
+                      auditMutation.mutate({
+                        syllabus_a_markdown: customCourseA.syllabus_markdown,
+                        syllabus_b_markdown: customCourseB.syllabus_markdown,
+                        course_a_code: customCourseA.code,
+                        course_b_code: customCourseB.code,
+                      });
+                    }
+                  }}
+                  className="shrink-0"
+                >
+                  Run Harmonization Audit
+                </Button>
+              </div>
+
+              {isSameFile ? (
+                <div className="flex items-center gap-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                  <span>
+                    Validation Error: The same curriculum file cannot be uploaded for both Prerequisite (A) and Target (B). Please select two different course curriculum files.
+                  </span>
+                </div>
+              ) : null}
+
+              {loadError ? <p className="text-[11px] text-rose-300 font-medium">{loadError}</p> : null}
+            </CardBody>
+          </Card>
+
+          {/* --- Results ------------------------------------------------------ */}
+          {!customCourseA && !customCourseB && !report ? (
+            <Card>
+              <EmptyState
+                icon={ScanSearch}
+                title="No audit run yet"
+                description="Upload two curriculum markdown files (.md / .txt) or click 'Load Overlapping Curriculums Sample'."
+                actionLabel="Load Overlapping Curriculums Sample"
+                onAction={loadSamplePair}
+              />
+            </Card>
+          ) : isFetching && !report ? (
+            <LoadingResults />
+          ) : auditMutation.isError ? (
+            <Card>
+              <EmptyState
+                tone="critical"
+                icon={AlertTriangle}
+                title="The harmonization audit failed"
+                description={auditMutation.error?.message ?? 'The request did not complete.'}
+                actionLabel="Try again"
+                onAction={loadSamplePair}
+              />
+            </Card>
+          ) : !report ? (
+            <LoadingResults />
+          ) : (
+            <>
+              <AlignmentHeader report={report} courseA={submittedA} courseB={submittedB} />
+              <SyllabusDiff report={report} courseA={submittedA} courseB={submittedB} />
+              <FindingsTabs report={report} courseA={submittedA} courseB={submittedB} />
+              <ActionableChanges changes={report.actionable_changes} />
+              <AiSummaryCard
+                summary={report.ai_summary}
+                meta={
+                  submittedA && submittedB ? `${submittedA.code} → ${submittedB.code}` : undefined
+                }
+              />
+            </>
+          )}
+
+          {/* Refetching an already-visible pair keeps the results on screen. */}
+          {report && isFetching ? (
+            <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <RotateCw className="h-3 w-3 animate-spin" strokeWidth={2} aria-hidden="true" />
+              Re-running the audit…
+            </p>
+          ) : null}
         </>
       )}
-
-      {/* Refetching an already-visible pair keeps the results on screen. */}
-      {submitted && report && auditQuery.isFetching ? (
-        <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
-          <RotateCw className="h-3 w-3 animate-spin" strokeWidth={2} aria-hidden="true" />
-          Re-running the audit…
-        </p>
-      ) : null}
     </div>
   );
 }
+

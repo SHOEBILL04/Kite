@@ -94,29 +94,24 @@
     ],
     "insights": [
         {
-            "title": "Section mean gap between Section A and Section B",
-            "detail": "Section A averages 24.30 (leniency index 1.23) against 16.50 in Section B (leniency index 0.79) — a gap of 7.80 marks on the same assessment. Identical cohorts should not diverge this far.",
+            "title": "7.7-mark gap on a 30-mark midterm",
+            "detail": "Section A averages 24.2 against Section B at 16.5 — a 25.7 percentage-point spread. Quiz averages and attendance are statistically indistinguishable across the two sections, so intake ability does not explain the gap.",
             "severity": "high"
         },
         {
-            "title": "Section A sits above the cohort mean",
-            "detail": "Section A (n=20, instructor Prof. Monir) has a z-score of 0.60 against the cohort, with standard deviation 1.60 and skewness -0.38.",
-            "severity": "medium"
-        },
-        {
-            "title": "Section B sits below the cohort mean",
-            "detail": "Section B (n=20, instructor Dr. Hasan) has a z-score of -0.60 against the cohort, with standard deviation 7.30 and skewness 0.38.",
-            "severity": "medium"
-        },
-        {
-            "title": "Unequal spread between sections",
-            "detail": "The wider section varies 4.56x more than the tighter one, so the two graders are not only differing on average but on how far they spread marks.",
+            "title": "Section A distribution is compressed",
+            "detail": "A standard deviation of 1.9 with every student inside the 21-30 band indicates ceiling-clustered marking. The section carries almost no discriminating power between its strongest and weakest students.",
             "severity": "high"
         },
         {
-            "title": "Proposed normalisation",
-            "detail": "A shift of +4.5 marks on Section B realigns it with the cohort mean while preserving within-section rank order.",
-            "severity": "low"
+            "title": "Section B marking is erratic",
+            "detail": "A standard deviation of 6.8 — 3.6x Section A — spread across five mark bands suggests inconsistent rubric application rather than a genuinely wider ability range.",
+            "severity": "medium"
+        },
+        {
+            "title": "Cross-section CGPA impact",
+            "detail": "Two students with identical underlying quiz averages would land roughly one letter grade apart purely on section assignment.",
+            "severity": "medium"
         }
     ],
     "normalization": {
@@ -124,5 +119,5 @@
         "suggested_shift": 4.5,
         "rationale": "Applying a +4.5 mark normalisation shift to Section B realigns the section mean with cohort expectations based on student coursework baseline, mitigating grader disparity while preserving rank order."
     },
-    "ai_summary": "Grading drift detected: Section A averages 24.30 marks against 16.50 in Section B on the same assessment, a leniency spread of 1.23 versus 0.79. A +4.5 mark normalisation on Section B is proposed."
+    "ai_summary": "Grading parity between the two CSE 2101 midterm sections has broken down. Section A (Prof. Monir) averages 24.2/30 with a standard deviation of 1.9, while Section B (Dr. Hasan) averages 16.5/30 with a standard deviation of 6.8. Because quiz performance and attendance are comparable across both cohorts, the 7.7-mark gap is attributable to marker behaviour, not student ability. Section A shows ceiling compression — no student scored below 21 — and Section B shows erratic dispersion across five bands. Recommended action: apply a +3.9 normalisation shift to Section B, and require a rubric-anchored re-mark of a Section A sample before final grades are published."
 }

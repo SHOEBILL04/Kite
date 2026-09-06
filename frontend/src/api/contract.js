@@ -110,6 +110,8 @@ export const ENDPOINTS = {
   auditGradingDrift: '/audit/grading-drift',
   /** POST — body `{ course_a_id: number, course_b_id: number }` -> {@link SyllabusReport} */
   auditSyllabus: '/audit/syllabus',
+  /** POST — body `{ syllabus_markdown: string, code?: string, title?: string }` -> {@link NewCourseCrossAuditReport} */
+  auditSyllabusCrossAudit: '/audit/syllabus/cross-audit',
   /** POST — body `{ exam_id: number }` -> {@link ExamModerationReport} */
   auditExamModeration: '/audit/exam-moderation',
   /** POST — body `{ course_id: number }` -> {@link VulnerableStudentsReport} */
