@@ -31,4 +31,21 @@ return [
         ],
     ],
 
+    'ai' => [
+        'mode' => env('AI_MODE', 'fixture'), // live | fixture | cache_only
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+        'temperature' => (float) env('GEMINI_TEMPERATURE', 0.2),
+    ],
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+        'temperature' => (float) env('GROQ_TEMPERATURE', 0.2),
+    ],
+
+
 ];

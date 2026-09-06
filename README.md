@@ -101,5 +101,47 @@ The backend will start at **`http://127.0.0.1:8000`**.
 
 ```bash
 cd backend
-php artisan test --filter=AuthAndFoundationTest
+php artisan test
 ```
+
+---
+
+## AI Inference Layer & Multi-Tier Failover Architecture
+
+CogniFaculty treats AI provider unreliability as expected rather than exceptional. The system utilizes an orchestrated, 5-tier failover pipeline via `App\Services\Ai\AiClient`:
+
+```text
+               User Audit Request
+                       │
+                       ▼
+          [ 1. Fixture Mode Check ] ── (AI_MODE=fixture or no keys) ──► Return Static Fixture
+                       │
+                       ▼
+          [ 2. SQLite Cache Check ] ── (Hit: SHA256 prompt hash) ─────► Instant Return (<5ms)
+                       │
+                       ▼
+          [ 3. Primary: Gemini Flash ] (with 1s/2s/4s backoff on 429) ─► Cache & Return
+                       │
+                 (Exhausted / 429)
+                       ▼
+          [ 4. Fallback: Groq LLaMA 3.3 70B ] ─────────────────────────► Cache & Return
+                       │
+                 (Failed / Invalid)
+                       ▼
+          [ 5. One-Shot Schema Repair ] ───────────────────────────────► Cache & Return
+                       │
+                 (Repair Failed)
+                       ▼
+          [ 6. Safe Fixture Fallback ] ────────────────────────────────► 100% Guaranteed Return
+                       │
+                       ▼
+           [ Log Audit Trail to ai_runs ]
+```
+
+### Key Reliability Guarantees:
+1. **Zero-Key Execution:** The application is 100% demoable offline or without external API keys. If keys are missing, it serves deterministic pre-computed fixtures from `storage/app/fixtures/*.json`.
+2. **Structural JSON Constraints:** Gemini requests strictly enforce `generationConfig.responseSchema` with `application/json` MIME type, preventing hallucinated formatting.
+3. **Pre-Demo Cache Warming (`php artisan ai:warm`):** Pre-runs all audit tasks against the seeded database and populates SQLite `ai_cache`, ensuring lightning-fast responses during live judging.
+4. **Fixture Synchronization (`php artisan ai:fixtures:dump`):** Dumps active cache entries to disk so offline fixtures stay current with prompt evolutions.
+5. **Audit Run Telemetry (`ai_runs` table):** Tracks model attribution, latency in milliseconds, prompt/completion tokens, and cache hits.
+
